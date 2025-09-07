@@ -11,6 +11,8 @@ from PyQt6.QtWebChannel import QWebChannel
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWebEngineCore import QWebEngineProfile
 from PyQt6.QtWebEngineCore import QWebEngineProfile, QWebEnginePage
+from PyQt6.QtCore import QEvent
+
 
 from pypresence import Presence
 import subprocess
@@ -29,8 +31,16 @@ def is_connected():
 os.environ['QTWEBENGINE_CHROMIUM_FLAGS'] = (
     '--disable-software-rasterizer '
     '--disable-accelerated-2d-canvas '
-    '--disable-background-timer-throttling '
-    '--disable-renderer-backgrounding'
+    '--autoplay-policy=no-user-gesture-required '
+    '--ignore-gpu-blocklist '
+    '--enable-features=AudioServiceOutOfProcess '
+    '--enable-features=AudioServiceAudioStreams '
+    '--disable-geolocation '
+    '--disable-translate '
+    '--disable-sync '
+    '--disable-print-preview '
+    '--disable-extensions '
+    '--disable-component-update '
 )
 
 def rpc():
@@ -66,6 +76,10 @@ class Bridge(QObject):
     @pyqtSlot()
     def minimize_app(self):
         self.window.fade_and_minimize()  
+        QWebEngineProfile.defaultProfile().clearHttpCache()
+        QWebEngineProfile.defaultProfile().clearAllVisitedLinks()
+
+        
     @pyqtSlot(int, int)
     def move_window(self, x, y):
         self.window.move(x, y)
@@ -97,6 +111,13 @@ class Browser(QMainWindow):
         self.browser.settings().setAttribute(QWebEngineSettings.WebAttribute.JavascriptCanOpenWindows, True)  
         self.browser.settings().setAttribute(QWebEngineSettings.WebAttribute.LocalStorageEnabled, True)      
         self.browser.settings().setAttribute(QWebEngineSettings.WebAttribute.XSSAuditingEnabled, True)
+        self.browser.settings().setAttribute(QWebEngineSettings.WebAttribute.PluginsEnabled, False)
+        self.browser.settings().setAttribute(QWebEngineSettings.WebAttribute.JavascriptCanOpenWindows, False)
+        self.browser.settings().setAttribute(QWebEngineSettings.WebAttribute.LocalStorageEnabled, True)  
+        self.browser.settings().setAttribute(QWebEngineSettings.WebAttribute.XSSAuditingEnabled, False) 
+        self.browser.settings().setAttribute(QWebEngineSettings.WebAttribute.ErrorPageEnabled, False)
+
+        
 
         self.channel = QWebChannel()
         self.bridge = Bridge(self)
@@ -110,6 +131,20 @@ class Browser(QMainWindow):
         )
 
         self.browser.load(QUrl(url))
+        
+    
+    def changeEvent(self, event):
+        if event.type() == QEvent.Type.WindowStateChange:
+            if self.isMinimized():
+                print("closed")
+                self.browser.hide()
+
+            else:
+                print("opened")
+                self.browser.show()
+
+        super().changeEvent(event)
+
 
 
     def fade_and_close(self):
@@ -141,7 +176,7 @@ if __name__ == "__main__":
     app.setApplicationDisplayName("STEENY")
     app.setOrganizationName("Ivan0n co.")
     app.setWindowIcon(QIcon("icon.ico"))
-
+    
     if is_connected():
         url = "http://127.0.0.1:2020/home"
     else:
