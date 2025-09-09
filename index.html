@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>steeny — стриминг музыки</title>
+  <meta name="description" content="steeny — минималистичный сервис стриминга музыки" />
+  <link rel="icon" type="image/png" href="logo.jpg">
+  <style>
+    :root{
+      --bg:#0b0b0b;
+      --fg:#f6f6f6;
+      --muted:#bfbfbf;
+      --accent:#ffffff;
+      --glass: rgba(255,255,255,0.04);
+      font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;}
+    body{
+      background: linear-gradient(180deg,var(--bg) 0%, #070707 100%);
+      color:var(--fg);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:32px;
+      overflow:hidden;
+    }
+
+    /* снег как частицы */
+    .snow{
+      position:fixed;
+      top:0;left:0;right:0;bottom:0;
+      pointer-events:none;
+      overflow:hidden;
+      z-index:0;
+    }
+    .flake{
+      position:absolute;
+      top:-10px;
+      width:4px;height:4px;
+      border-radius:50%;
+      background:#fff;
+      opacity:0.9;
+      animation: fall linear infinite;
+    }
+    @keyframes fall{
+      0%{transform:translateY(-10px);opacity:0;}
+      10%{opacity:0.9;}
+      100%{transform:translateY(100vh);opacity:0;}
+    }
+
+    .card{
+      position:relative;
+      z-index:1;
+      width:100%;
+      max-width:960px;
+      background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border:1px solid rgba(255,255,255,0.06);
+      padding:36px;
+      border-radius:16px;
+      box-shadow: 0 6px 30px rgba(0,0,0,0.6);
+      display:grid;
+      grid-template-columns: 1fr 360px;
+      gap:28px;
+      align-items:stretch;
+      animation: fadeIn 1.2s ease;
+    }
+
+    @keyframes fadeIn {
+      from{opacity:0;transform:translateY(20px)}
+      to{opacity:1;transform:translateY(0)}
+    }
+
+    .brand{
+      display:flex;
+      gap:18px;
+      align-items:center;
+      margin-bottom:12px;
+      animation: slideIn 1.4s ease;
+    }
+    @keyframes slideIn {
+      from{opacity:0;transform:translateX(-30px)}
+      to{opacity:1;transform:translateX(0)}
+    }
+
+    .logo{
+      width:72px;
+      height:72px;
+      border-radius:12px;
+      background:linear-gradient(135deg,#000,#222);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-weight:700;
+      font-size:28px;
+      color:var(--accent);
+      border:1px solid rgba(255,255,255,0.06);
+      letter-spacing:1px;
+    }
+
+    h1{margin:0;font-size:36px;line-height:1.03}
+    p.lead{margin:12px 0 22px;color:var(--muted);font-size:16px}
+
+    .features{display:flex;flex-direction:column;gap:12px}
+    .feature{
+      padding:12px 14px;
+      border-radius:10px;
+      background:var(--glass);
+      border:1px solid rgba(255,255,255,0.02);
+      color:var(--fg);
+      font-size:14px;
+      animation: fadeInUp 1.6s ease;
+    }
+    @keyframes fadeInUp {
+      from{opacity:0;transform:translateY(20px)}
+      to{opacity:1;transform:translateY(0)}
+    }
+
+    .right{
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      gap:18px;
+      padding:18px;
+      border-radius:12px;
+      background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.00));
+      border-left:1px dashed rgba(255,255,255,0.03);
+      text-align:center;
+    }
+
+    .controls{display:flex;gap:10px;align-items:center;animation: fadeIn 1.8s ease;}
+    .btn{
+      display:inline-flex;align-items:center;gap:10px;justify-content:center;padding:10px 16px;border-radius:10px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:var(--fg);cursor:pointer;font-weight:600;text-decoration:none;transition:transform .2s ease
+    }
+    .btn:hover{transform:scale(1.05)}
+    .btn.primary{background:var(--fg);color:var(--bg);border:none;box-shadow:0 6px 18px rgba(0,0,0,0.6)}
+
+    footer.note{grid-column:1/-1;margin-top:18px;color:var(--muted);font-size:13px;text-align:center}
+
+    @media (max-width:880px){
+      .card{grid-template-columns:1fr;}
+      .right{order:-1}
+    }
+
+  </style>
+</head>
+<body>
+  <div class="snow" id="snow"></div>
+
+  <main class="card" role="main">
+    <section>
+      <div class="brand">
+        <div class="logo"><img src="logo.jpg" alt="" width="65px"></div>
+        <div>
+          <h1>steeny</h1>
+          <div style="color:var(--muted);font-size:13px;margin-top:6px">Бесплатный стриминговый сервис с возможностью self-hosted решения.</div>
+        </div>
+      </div>
+
+      <p class="lead">Steeny — Скорее всего, это стартап, но без стороннего финансирования: с июня–июля 2025 команда ежедневно разрабатывает проект, тестирует функции и шлифует детали.</p>
+
+      <div class="features">
+        <div class="feature">♬ Минималистичный дизайн, созданный для концентрации</div>
+        <div class="feature">⚡ Молниеносная работа приложения и загрузка треков</div>
+        <div class="feature">🔒 Конфиденциальность и контроль над данными слушателя</div>
+      </div>
+
+      <footer class="note">Скачивая данный проект, вы соглашаетесь с <br><a href="elua.html" style="color: rgb(198, 198, 248); text-decoration: none;">Пользовательским Соглашением Сервиса</a></footer>
+    </section>
+
+    <aside class="right" aria-label="контроль">
+      <h2 style="margin:0;font-size:20px;">Попробуйте steeny</h2>
+      <p style="font-size:14px;color:var(--muted);margin:0 0 12px;">Скачайте проект и настройте свой собственный сервер стриминга.</p>
+      <div class="controls" role="group" aria-label="действия">
+        <a class="btn primary" id="downloadBtn" href="https://github.com/Ivan0n/STEENY" rel="noopener noreferrer" aria-label="Скачать с GitHub">Скачать</a>
+        <a class="btn primary" id="downloadBtn" href="https://github.com/Ivan0n/STEENY" rel="noopener noreferrer" aria-label="Скачать с GitHub">GitHub</a>
+      </div>
+      <div style="font-size:13px;color:var(--muted);text-align:center;margin-top:8px;">Open‑source</div>
+    </aside>
+  </main>
+
+  <script>
+    // генерируем снежные частицы
+    const snowContainer = document.getElementById('snow');
+    function createFlake(){
+      const flake = document.createElement('div');
+      flake.classList.add('flake');
+      flake.style.left = Math.random()*100+'vw';
+      flake.style.width = flake.style.height = (2+Math.random()*4)+'px';
+      flake.style.animationDuration = 4+Math.random()*8+'s';
+      snowContainer.appendChild(flake);
+      setTimeout(()=>flake.remove(),15000);
+    }
+    setInterval(createFlake,150);
+  </script>
+</body>
+</html>
