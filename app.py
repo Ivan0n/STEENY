@@ -3,16 +3,16 @@ import sys
 import time
 import threading
 
-from PyQt6.QtWidgets import QApplication, QMainWindow
+from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QHBoxLayout, 
+                             QPushButton, QSpacerItem, QSizePolicy, QVBoxLayout)
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWebEngineCore import QWebEngineSettings
 from PyQt6.QtCore import QUrl, QObject, pyqtSlot, Qt, QPropertyAnimation, QEasingCurve, QTimer
 from PyQt6.QtWebChannel import QWebChannel
-from PyQt6.QtGui import QIcon
-from PyQt6.QtWebEngineCore import QWebEngineProfile
+from PyQt6.QtGui import QIcon, QPainter, QColor
 from PyQt6.QtWebEngineCore import QWebEngineProfile, QWebEnginePage
 from PyQt6.QtCore import QEvent
-
+from PyQt6.QtGui import QWheelEvent
 
 from pypresence import Presence
 import subprocess
@@ -64,6 +64,81 @@ def rpc():
     except Exception as e:
         print(f"Ошибка RPC: {e}")
 
+class TitleBar(QWidget):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.parent = parent
+        self.setFixedHeight(30)
+        self.setStyleSheet("background-color: black;")
+        
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(5, 0, 5, 0)
+        layout.setSpacing(5)
+
+        spacer = QSpacerItem(20, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+        
+
+        self.minimize_btn = QPushButton("—")
+        self.minimize_btn.setFixedSize(20, 20)
+        self.minimize_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #333333;
+                color: white;
+                border: none;
+                border-radius: 3px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #555555;
+            }
+        """)
+        self.minimize_btn.clicked.connect(self.parent.showMinimized)
+        
+
+        self.maximize_btn = QPushButton("□")
+        self.maximize_btn.setFixedSize(20, 20)
+        self.maximize_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #333333;
+                color: white;
+                border: none;
+                border-radius: 3px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #555555;
+            }
+        """)
+        self.maximize_btn.clicked.connect(self.toggle_maximize)
+        
+
+        self.close_btn = QPushButton("×")
+        self.close_btn.setFixedSize(20, 20)
+        self.close_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #333333;
+                color: white;
+                border: none;
+                border-radius: 3px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #FF5555;
+            }
+        """)
+        self.close_btn.clicked.connect(self.parent.close)
+        
+        layout.addItem(spacer)
+        layout.addWidget(self.minimize_btn)
+        layout.addWidget(self.maximize_btn)
+        layout.addWidget(self.close_btn)
+    
+    def toggle_maximize(self):
+        if self.parent.isMaximized():
+            self.parent.showNormal()
+        else:
+            self.parent.showMaximized()
+
 class Bridge(QObject):
     def __init__(self, window):
         super().__init__()
@@ -79,7 +154,6 @@ class Bridge(QObject):
         QWebEngineProfile.defaultProfile().clearHttpCache()
         QWebEngineProfile.defaultProfile().clearAllVisitedLinks()
 
-        
     @pyqtSlot(int, int)
     def move_window(self, x, y):
         self.window.move(x, y)
@@ -87,14 +161,29 @@ class Bridge(QObject):
 class Browser(QMainWindow):
     def __init__(self, url):
         super().__init__()
+        
         self.setWindowTitle("STEENY - лучший стриминговый сервис")
-        self.setGeometry(100, 100, 1024, 768)
-        self.setWindowFlag(Qt.WindowType.FramelessWindowHint)
+        self.setGeometry(100, 100, 1154, 868)
         self.setWindowIcon(QIcon("icon.ico"))
+        
+
+        self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
+        
+
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        
+        main_layout = QVBoxLayout(central_widget)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+        
+
+        self.title_bar = TitleBar(self)
+        main_layout.addWidget(self.title_bar)
+        
 
         self.browser = QWebEngineView()
-        self.setCentralWidget(self.browser)
-
+        main_layout.addWidget(self.browser)
 
         profile_path = os.path.join(os.getcwd(), "profile")
         self.profile = QWebEngineProfile("SSTEENYProfile", self)
@@ -117,8 +206,6 @@ class Browser(QMainWindow):
         self.browser.settings().setAttribute(QWebEngineSettings.WebAttribute.XSSAuditingEnabled, False) 
         self.browser.settings().setAttribute(QWebEngineSettings.WebAttribute.ErrorPageEnabled, False)
 
-        
-
         self.channel = QWebChannel()
         self.bridge = Bridge(self)
         self.channel.registerObject("bridge", self.bridge)
@@ -129,24 +216,62 @@ class Browser(QMainWindow):
             "AppleWebKit/537.36 (KHTML, like Gecko) "
             "Chrome/120.0.0.0 Safari/537.36"
         )
+        self.browser.loadFinished.connect(self.disable_zoom)
 
         self.browser.load(QUrl(url))
         
+
+        self.old_pos = None
     
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.old_pos = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+            event.accept()
+    def wheelEvent(self, event):
+
+        if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
+
+            event.ignore()
+        else:
+
+            super().wheelEvent(event)
+    def mouseMoveEvent(self, event):
+        if self.old_pos is not None and event.buttons() == Qt.MouseButton.LeftButton:
+            self.move(event.globalPosition().toPoint() - self.old_pos)
+            event.accept()
+    
+    def mouseReleaseEvent(self, event):
+        self.old_pos = None
+        event.accept()
+
     def changeEvent(self, event):
         if event.type() == QEvent.Type.WindowStateChange:
             if self.isMinimized():
                 print("closed")
+                
                 self.browser.hide()
-
             else:
                 print("opened")
                 self.browser.show()
-
         super().changeEvent(event)
-
-
-
+    def disable_zoom(self):
+        zoom_block_script = """
+        document.addEventListener('wheel', function(e) {
+            if (e.ctrlKey) {
+                e.preventDefault();
+                return false;
+            }
+        }, { passive: false });
+        
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && (e.key === '+' || e.key === '-' || e.key === '0' || 
+                              e.keyCode === 107 || e.keyCode === 109 || e.keyCode === 48)) {
+                e.preventDefault();
+                return false;
+            }
+        });
+        """
+        self.browser.page().runJavaScript(zoom_block_script)
     def fade_and_close(self):
         self.animation = QPropertyAnimation(self, b"windowOpacity")
         self.animation.setDuration(300)
@@ -155,7 +280,6 @@ class Browser(QMainWindow):
         self.animation.setEasingCurve(QEasingCurve.Type.InOutQuad)
         self.animation.finished.connect(self.close)
         self.animation.start()
-
 
     def fade_and_minimize(self):
         self.animation = QPropertyAnimation(self, b"windowOpacity")
@@ -184,7 +308,6 @@ if __name__ == "__main__":
         url = QUrl.fromLocalFile(local_file).toString()
 
     window = Browser(url)
-
     window.show()
 
     threading.Thread(target=rpc, daemon=True).start()
