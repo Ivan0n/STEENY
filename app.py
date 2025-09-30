@@ -41,6 +41,9 @@ os.environ['QTWEBENGINE_CHROMIUM_FLAGS'] = (
     '--disable-print-preview '
     '--disable-extensions '
     '--disable-component-update '
+    '--disable-web-security '  
+    '--allow-running-insecure-content '
+    '--ignore-certificate-errors'
 )
 
 def rpc():
@@ -56,13 +59,27 @@ def rpc():
             large_text="STEENY",
             small_image="logo",
             small_text="STEENY Networks",
-            buttons=[
-                {"label": "GitHub", "url": "https://github.com/Ivan0n"}
-            ]
         )
         print("Rich Presence установлен.")
     except Exception as e:
         print(f"Ошибка RPC: {e}")
+class Bridge(QObject):
+    def __init__(self, window):
+        super().__init__()
+        self.window = window
+        self.rpc_enabled = True
+        self.rpc_thread = None
+
+    @pyqtSlot(bool)  
+    def toggle_rpc(self, state: bool):
+        self.rpc_enabled = state
+        if state:
+            if not self.rpc_thread or not self.rpc_thread.is_alive():
+                self.rpc_thread = threading.Thread(target=rpc, daemon=True)
+                self.rpc_thread.start()
+                print("RPC включён")
+        else:
+            print("RPC выключен (перезапусти Discord, чтобы очистить статус)")
 
 class TitleBar(QWidget):
     def __init__(self, parent):
@@ -163,11 +180,10 @@ class Browser(QMainWindow):
         super().__init__()
         
         self.setWindowTitle("STEENY - лучший стриминговый сервис")
-        self.setGeometry(100, 100, 1154, 868)
+        self.setGeometry(100, 100, 1354, 868)
         self.setWindowIcon(QIcon("icon.ico"))
         
 
-        self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
         
 
         central_widget = QWidget()
@@ -186,16 +202,25 @@ class Browser(QMainWindow):
         main_layout.addWidget(self.browser)
 
         profile_path = os.path.join(os.getcwd(), "profile")
-        self.profile = QWebEngineProfile("SSTEENYProfile", self)
+        self.profile = QWebEngineProfile("STEENYProfile", self)
         self.profile.setPersistentCookiesPolicy(QWebEngineProfile.PersistentCookiesPolicy.ForcePersistentCookies)
         self.profile.setCachePath(os.path.join(profile_path, "cache"))
         self.profile.setPersistentStoragePath(os.path.join(profile_path, "storage"))
 
         self.page = QWebEnginePage(self.profile, self.browser)
         self.browser.setPage(self.page)
+        
+        self.setWindowFlags(
+            Qt.WindowType.FramelessWindowHint |
+            Qt.WindowType.Window |
+            Qt.WindowType.CustomizeWindowHint 
+
+        )
+
 
         self.browser.settings().setAttribute(QWebEngineSettings.WebAttribute.FullScreenSupportEnabled, True)
-        self.browser.settings().setAttribute(QWebEngineSettings.WebAttribute.PlaybackRequiresUserGesture, False)
+        self.browser.settings().setAttribute(QWebEngineSettings.WebAttribute.PlaybackRequiresUserGesture, True)
+
         self.browser.settings().setAttribute(QWebEngineSettings.WebAttribute.PluginsEnabled, False)
         self.browser.settings().setAttribute(QWebEngineSettings.WebAttribute.JavascriptCanOpenWindows, True)  
         self.browser.settings().setAttribute(QWebEngineSettings.WebAttribute.LocalStorageEnabled, True)      
@@ -211,11 +236,7 @@ class Browser(QMainWindow):
         self.channel.registerObject("bridge", self.bridge)
         self.browser.page().setWebChannel(self.channel)
 
-        self.browser.page().profile().setHttpUserAgent(
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/120.0.0.0 Safari/537.36"
-        )
+
         self.browser.loadFinished.connect(self.disable_zoom)
 
         self.browser.load(QUrl(url))
@@ -302,7 +323,7 @@ if __name__ == "__main__":
     app.setWindowIcon(QIcon("icon.ico"))
     
     if is_connected():
-        url = "http://127.0.0.1:2020/home"
+        url = "http://185.143.238.53:2020/home"
     else:
         local_file = os.path.abspath("ofline.html")
         url = QUrl.fromLocalFile(local_file).toString()
