@@ -323,7 +323,7 @@ if __name__ == "__main__":
     app.setWindowIcon(QIcon("icon.ico"))
     
     if is_connected():
-        url = "http://185.143.238.53:2020/home"
+        url = "https://music.steeny.fun/home"
     else:
         local_file = os.path.abspath("ofline.html")
         url = QUrl.fromLocalFile(local_file).toString()
