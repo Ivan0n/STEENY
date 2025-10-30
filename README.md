@@ -10,3 +10,5 @@ You can install the server version on your selfhost and listen to music without 
 ## ✨ What is Steeny?
 
 This is a free music streaming service that **runs on your server** and **you have full control over your data and library**.
+
+* 
