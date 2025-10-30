@@ -1,4 +1,7 @@
 # STEENY
+
+[![Server Repo](https://img.shields.io/badge/Server-GitHub-purple.svg)](https://github.com/Ivan0n/steeny-recode)
+
 🔑 Основные особенности
 
 - Потоковое воспроизведение музыки в реальном времени
