@@ -537,6 +537,21 @@ class Bridge(QObject):
         factor = max(0.5, min(2.0, factor))
         self.window.browser.setZoomFactor(factor)
 
+    @pyqtSlot(str)
+    def open_external_url(self, raw_url):
+        """Open a user-selected web link in the system browser."""
+        value = str(raw_url).strip()
+        if not value or len(value) > 4096:
+            return
+
+        url = QUrl(value)
+        if (not url.isValid() or
+                url.scheme().lower() not in {'http', 'https'} or
+                not url.host()):
+            return
+
+        QDesktopServices.openUrl(url)
+
     # ── Discord RPC ──
     @pyqtSlot(str)
     def update_rpc(self, data_json: str):
