@@ -1,53 +1,72 @@
-# 🎧 Steeny music 
+# STEENY Desktop
 
-[![Server Repo](https://img.shields.io/badge/Server-GitHub-purple.svg)](https://github.com/Ivan0n/steeny-recode)
-[![Download Client](https://img.shields.io/badge/Client-Download-green.svg)](https://github.com/Ivan0n/STEENY/releases)
-[![Open Source](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+Кроссплатформенный Electron-клиент музыкального сервиса STEENY.
 
-A free self-hosted music streaming service that gives you **full control over your music, privacy, and data**.  
-No ads. No tracking. No restrictions. Fully open-source.🐧
+Клиент открывает существующий веб-интерфейс backend и добавляет нативные
+возможности: системный трей, управление окном, постоянную сессию, открытие
+ссылок в браузере, Discord Rich Presence и реакцию интерфейса на питание от
+батареи.
 
----
+## Требования
 
-## ✨ What is Steeny?
+- Node.js 22.12 или новее
+- запущенный STEENY backend
 
-Steeny is a personal music streaming platform designed to run on your own server or PC.
-
-Key principles:
-
-* Full data ownership — no third-party services
-* Clean, lightweight interface
-* No ads or analytics
-* Familiar experience similar to mainstream music platforms
-
----
-## 🚀 Features
-
-* Self-hosted music library
-* User authorization system
-* Playlist support
-* Web-based UI + desktop client (Pyqt)
-* Local cookies management
-* Cross-platform design (Linux, Windows; Android client planned)
-* No third-party ads or data collection
-
----
-## 🏗️ Tech Stack
-
-**Server:**
-* Python 3.12
-* Flask
-* CSV storage
-* HTML5 / CSS3 / JavaScript
-
-**Client:**
-* Python
-* Pyqt (native-like desktop app)
----
-## 📦 Installation (Server)
+## Запуск
 
 ```bash
-git clone https://github.com/Ivan0n/steeny-recode
-cd steeny-recode
-pip install flask
-python __main__.py
+npm install
+npm start
+```
+
+По умолчанию используется `http://127.0.0.1:5000`. Другой адрес можно указать
+переменной окружения:
+
+```bash
+STEENY_URL=https://music.example.com npm start
+```
+
+Для запуска с открытыми DevTools:
+
+```bash
+npm run dev
+```
+
+## Проверка и сборка
+
+```bash
+npm run check
+npm run pack
+```
+
+Готовые дистрибутивы создаются в `dist/`:
+
+```bash
+npm run dist:linux
+npm run dist:win
+```
+
+Windows-сборку рекомендуется запускать на Windows или в CI с Windows runner.
+На Linux можно запустить AppImage напрямую или установить `.deb`:
+
+```bash
+chmod +x dist/STEENY-*-linux-*.AppImage
+./dist/STEENY-*-linux-*.AppImage
+
+sudo apt install ./dist/STEENY-*-linux-*.deb
+```
+
+## Безопасность
+
+- Node.js не доступен коду страницы (`nodeIntegration: false`).
+- Интерфейс получает только ограниченный API через изолированный preload.
+- Главное окно может переходить только на origin, заданный в `STEENY_URL`.
+- Внешние HTTP/HTTPS-ссылки открываются системным браузером.
+- Разрешение media выдаётся только локальному интерфейсу и только для аудио.
+
+Сессия и cookies хранятся в отдельном постоянном Electron-профиле `steeny`.
+
+## Старый клиент
+
+Предыдущая реализация на PyQt сохранена в `legacy/` только для истории и
+аварийного отката. Основной клиент запускается командами npm.

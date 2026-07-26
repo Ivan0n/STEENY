@@ -1,1 +1,4 @@
 profile/
+node_modules/
+dist/
+*.log
