@@ -13,6 +13,13 @@ function deliverPowerState(charging) {
   }
 }
 
+function makeTitlebarControlsInteractive() {
+  // The web UI owns the frameless titlebar. Keep its home/logo control out of
+  // Electron's drag region even while an older cached page stylesheet is used.
+  document.querySelector('.titlebar .logo')
+    ?.style.setProperty('-webkit-app-region', 'no-drag', 'important');
+}
+
 const bridge = Object.freeze({
   close_app: () => ipcRenderer.send('window:close'),
   minimize_app: () => ipcRenderer.send('window:minimize'),
@@ -28,6 +35,14 @@ const bridge = Object.freeze({
   update_rpc: dataJson => ipcRenderer.send('rpc:update', dataJson),
   clear_rpc: () => ipcRenderer.send('rpc:clear'),
   retry_backend: () => ipcRenderer.invoke('backend:retry'),
+  get_update_state: () => ipcRenderer.invoke('update:get-state'),
+  check_for_updates: () => ipcRenderer.invoke('update:check'),
+  install_update: () => ipcRenderer.send('update:install'),
+  open_update_page: () => ipcRenderer.send('update:open-releases'),
+  on_update_state: callback => {
+    if (typeof callback !== 'function') return;
+    ipcRenderer.on('update:state', (_event, state) => callback(state));
+  },
   is_electron: true,
 });
 
@@ -39,5 +54,6 @@ ipcRenderer.on('power-state', (_event, charging) => {
 
 window.addEventListener('DOMContentLoaded', () => {
   document.documentElement.classList.add('desktop-client', 'electron-client');
+  makeTitlebarControlsInteractive();
   if (lastChargingState !== null) deliverPowerState(lastChargingState);
 });

@@ -6,6 +6,7 @@ const { pathToFileURL } = require('node:url');
 const {
   app,
   BrowserWindow,
+  dialog,
   ipcMain,
   Menu,
   nativeImage,
@@ -16,9 +17,11 @@ const {
   shell,
   Tray,
 } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const { DiscordPresence } = require('./rpc');
+const { createUpdateManager } = require('./updater');
 
-const DEFAULT_APP_URL = 'http://127.0.0.1:5000';
+const DEFAULT_APP_URL = 'https://music.steeny.fun/home'
 function resolveAppUrl(rawUrl) {
   try {
     const value = new URL(String(rawUrl || DEFAULT_APP_URL).trim());
@@ -53,6 +56,7 @@ let mainWindow = null;
 let tray = null;
 let quitting = false;
 let offlineLoaded = false;
+let updates = null;
 const rpc = new DiscordPresence();
 
 function validBounds(value) {
@@ -181,6 +185,11 @@ function setupTray() {
     { label: 'Скрыть в трей', click: hideWindow },
     { type: 'separator' },
     {
+      label: 'Проверить обновления',
+      click: () => updates?.check({ manual: true }),
+    },
+    { type: 'separator' },
+    {
       label: 'Выйти из STEENY',
       click: () => {
         quitting = true;
@@ -261,7 +270,9 @@ function createWindow() {
   });
 
   const defaultUa = mainWindow.webContents.getUserAgent();
-  mainWindow.webContents.setUserAgent(`${defaultUa} SteenyClient/2.0`);
+  mainWindow.webContents.setUserAgent(
+    `${defaultUa} SteenyClient/${app.getVersion()}`,
+  );
   mainWindow.removeMenu();
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -394,6 +405,21 @@ function installIpcHandlers() {
     if (!fromMainWindow(event)) return false;
     return loadApp();
   });
+  ipcMain.handle('update:get-state', event => {
+    if (!fromMainWindow(event)) return null;
+    return updates?.getState() || null;
+  });
+  ipcMain.handle('update:check', async event => {
+    if (!fromMainWindow(event) || !updates) return null;
+    await updates.check({ manual: true });
+    return updates.getState();
+  });
+  ipcMain.on('update:install', event => {
+    if (fromMainWindow(event)) updates?.install();
+  });
+  ipcMain.on('update:open-releases', event => {
+    if (fromMainWindow(event)) updates?.openReleases();
+  });
 }
 
 if (!app.requestSingleInstanceLock()) {
@@ -406,11 +432,23 @@ if (!app.requestSingleInstanceLock()) {
     if (process.platform === 'win32') {
       app.setAppUserModelId('fun.steeny.desktop');
     }
+    updates = createUpdateManager({
+      app,
+      autoUpdater,
+      dialog,
+      shell,
+      getMainWindow: () => mainWindow,
+      showMainWindow: showWindow,
+      disabled: SMOKE_TEST,
+      manualOnly: process.platform === 'linux' && !process.env.APPIMAGE,
+    });
     installIpcHandlers();
     createWindow();
     setupTray();
+    updates.start();
     powerMonitor.on('on-ac', sendPowerState);
     powerMonitor.on('on-battery', sendPowerState);
+    powerMonitor.on('resume', () => updates?.check());
   });
 
   app.on('activate', () => {
@@ -419,6 +457,7 @@ if (!app.requestSingleInstanceLock()) {
   });
   app.on('before-quit', () => {
     quitting = true;
+    updates?.stop();
     saveWindowState();
     rpc.destroy();
   });

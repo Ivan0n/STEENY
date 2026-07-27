@@ -36,6 +36,7 @@ npm run dev
 
 ```bash
 npm run check
+npm test
 npm run pack
 ```
 
@@ -47,14 +48,57 @@ npm run dist:win
 ```
 
 Windows-сборку рекомендуется запускать на Windows или в CI с Windows runner.
-На Linux можно запустить AppImage напрямую или установить `.deb`:
+На Linux можно запустить AppImage напрямую или установить `.deb`/`.rpm`:
 
 ```bash
-chmod +x dist/STEENY-*-linux-*.AppImage
-./dist/STEENY-*-linux-*.AppImage
+chmod +x dist/STEENY-linux-*.AppImage
+./dist/STEENY-linux-*.AppImage
 
 sudo apt install ./dist/STEENY-*-linux-*.deb
+sudo dnf install ./dist/STEENY-*-linux-*.rpm
 ```
+
+## Автоматические обновления
+
+Клиент проверяет официальный
+[GitHub Releases](https://github.com/Ivan0n/SteenyClient/releases) через 12
+секунд после запуска, при выходе компьютера из сна и затем каждые четыре часа.
+
+- Windows NSIS: обновление загружается в фоне и устанавливается после
+  подтверждённого перезапуска.
+- Linux AppImage: файл обновляется на месте, если каталог доступен пользователю
+  для записи. Сборка использует современный статический runtime без зависимости
+  от FUSE2 и без отключения Chromium sandbox.
+- Linux DEB/RPM: клиент сообщает о новой версии и открывает официальный пакет;
+  установка выполняется через `apt`/`dnf`, без небезопасного привилегированного
+  автоустановщика.
+
+Состояние и ручная проверка доступны в `Настройки → Обновления` и в меню трея.
+
+Для работы updater каждый опубликованный релиз обязан содержать одновременно:
+
+- `STEENY-…-windows-…-setup.exe`, его `.blockmap` и `latest.yml`;
+- `STEENY-linux-….AppImage`, DEB, RPM и `latest-linux.yml`.
+
+Workflow `.github/workflows/release.yml` собирает обе платформы и публикует
+полный набор только для тега, совпадающего с `version`:
+
+```bash
+git tag v2.1.0
+git push origin v2.1.0
+```
+
+Релиз сначала создаётся как draft, файлы загружаются одной группой, и только
+после этого он становится Latest. Номер уже опубликованной версии нельзя
+переиспользовать — для исправления нужно повысить SemVer.
+
+Windows Setup публикуется без подписи и не требует сертификата или GitHub
+Secrets. При первом запуске Windows может показать предупреждение SmartScreen
+и «Неизвестный издатель» — это ожидаемо для неподписанных приложений. Токен
+GitHub не встраивается в приложение: публичные обновления скачиваются без него.
+
+Когда появится сертификат, включите `forceCodeSigning: true` и передайте
+`WIN_CSC_LINK` и `WIN_CSC_KEY_PASSWORD` в Windows job.
 
 ## Безопасность
 
@@ -63,6 +107,8 @@ sudo apt install ./dist/STEENY-*-linux-*.deb
 - Главное окно может переходить только на origin, заданный в `STEENY_URL`.
 - Внешние HTTP/HTTPS-ссылки открываются системным браузером.
 - Разрешение media выдаётся только локальному интерфейсу и только для аудио.
+- DEB/RPM не устанавливаются через режим непроверенных привилегированных
+  пакетов.
 
 Сессия и cookies хранятся в отдельном постоянном Electron-профиле `steeny`.
 

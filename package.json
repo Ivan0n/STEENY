@@ -1,11 +1,15 @@
 {
   "name": "steeny-client",
-  "version": "2.0.0",
+  "version": "2.1.2",
   "description": "Безопасный Electron-клиент для музыкального сервиса STEENY",
   "main": "src/main.js",
   "author": {
     "name": "Ivan0n",
     "email": "Ivan0n@users.noreply.github.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Ivan0n/SteenyClient.git"
   },
   "desktopName": "steeny.desktop",
   "license": "MIT",
@@ -16,21 +20,26 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron . --devtools",
-    "check": "node --check src/main.js && node --check src/preload.js && node --check src/rpc.js",
+    "check": "node --check src/main.js && node --check src/preload.js && node --check src/rpc.js && node --check src/updater.js",
+    "test": "node --test test/*.test.js",
     "smoke": "electron . --smoke-test",
     "pack": "electron-builder --dir",
     "dist": "electron-builder",
-    "dist:linux": "electron-builder --linux",
-    "dist:win": "electron-builder --win"
+    "dist:linux": "electron-builder --linux AppImage deb rpm --x64 --publish never",
+    "dist:win": "electron-builder --win nsis --x64 --publish never"
   },
   "dependencies": {
-    "discord-rpc": "^4.0.1"
+    "discord-rpc": "^4.0.1",
+    "electron-updater": "^6.8.9"
   },
   "devDependencies": {
     "electron": "^43.2.0",
     "electron-builder": "^26.15.3"
   },
   "build": {
+    "toolsets": {
+      "appimage": "1.0.3"
+    },
     "appId": "fun.steeny.desktop",
     "productName": "STEENY",
     "executableName": "steeny",
@@ -45,11 +54,19 @@
       "output": "dist",
       "buildResources": "assets"
     },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Ivan0n",
+        "repo": "SteenyClient",
+        "releaseType": "release"
+      }
+    ],
     "win": {
       "icon": "assets/icon.ico",
+      "forceCodeSigning": false,
       "target": [
-        "nsis",
-        "portable"
+        "nsis"
       ]
     },
     "nsis": {
@@ -59,16 +76,14 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
     },
-    "portable": {
-      "artifactName": "STEENY-${version}-windows-${arch}-portable.${ext}"
-    },
     "linux": {
       "icon": "assets/icon.png",
       "category": "AudioVideo;Audio;Player",
       "syncDesktopName": true,
       "target": [
         "AppImage",
-        "deb"
+        "deb",
+        "rpm"
       ]
     },
     "deb": {
@@ -82,6 +97,9 @@
         "libatspi2.0-0",
         "libuuid1"
       ]
+    },
+    "appImage": {
+      "artifactName": "STEENY-linux-${arch}.${ext}"
     }
   },
   "allowScripts": {
