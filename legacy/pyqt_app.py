@@ -1,3 +1,5 @@
+"""Устаревший PyQt-клиент, сохранённый для аварийного отката."""
+
 import os
 import sys
 import time
@@ -31,11 +33,13 @@ from pypresence import Presence
 import subprocess
 import ctypes
 
+_LEGACY_DIR = os.path.dirname(os.path.abspath(__file__))
+_PROJECT_DIR = os.path.dirname(_LEGACY_DIR)
+
 
 def _application_icon():
     """Load the packaged icon or build a visible fallback for the tray."""
-    icon = QIcon(os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                              'icon.ico'))
+    icon = QIcon(os.path.join(_PROJECT_DIR, 'assets', 'icon.ico'))
     if not icon.isNull():
         return icon
 
@@ -1068,7 +1072,8 @@ if __name__ == '__main__':
     app.setWindowIcon(_application_icon())
 
     url = 'http://127.0.0.1:5000' if is_connected() else \
-          QUrl.fromLocalFile(os.path.abspath('ofline.html')).toString()
+          QUrl.fromLocalFile(
+              os.path.join(_LEGACY_DIR, 'offline.html')).toString()
 
     window = Browser(url)
     window.show()

@@ -1,53 +1,120 @@
-# 🎧 Steeny music 
+# STEENY Desktop
 
-[![Server Repo](https://img.shields.io/badge/Server-GitHub-purple.svg)](https://github.com/Ivan0n/steeny-recode)
-[![Download Client](https://img.shields.io/badge/Client-Download-green.svg)](https://github.com/Ivan0n/STEENY/releases)
-[![Open Source](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+Кроссплатформенный Electron-клиент музыкального сервиса STEENY.
 
-A free self-hosted music streaming service that gives you **full control over your music, privacy, and data**.  
-No ads. No tracking. No restrictions. Fully open-source.🐧
+Клиент открывает существующий веб-интерфейс backend и добавляет нативные
+возможности: системный трей, управление окном, постоянную сессию, открытие
+ссылок в браузере, Discord Rich Presence и реакцию интерфейса на питание от
+батареи.
 
----
+## Требования
 
-## ✨ What is Steeny?
+- Node.js 22.12 или новее
+- запущенный STEENY backend
 
-Steeny is a personal music streaming platform designed to run on your own server or PC.
-
-Key principles:
-
-* Full data ownership — no third-party services
-* Clean, lightweight interface
-* No ads or analytics
-* Familiar experience similar to mainstream music platforms
-
----
-## 🚀 Features
-
-* Self-hosted music library
-* User authorization system
-* Playlist support
-* Web-based UI + desktop client (Pyqt)
-* Local cookies management
-* Cross-platform design (Linux, Windows; Android client planned)
-* No third-party ads or data collection
-
----
-## 🏗️ Tech Stack
-
-**Server:**
-* Python 3.12
-* Flask
-* CSV storage
-* HTML5 / CSS3 / JavaScript
-
-**Client:**
-* Python
-* Pyqt (native-like desktop app)
----
-## 📦 Installation (Server)
+## Запуск
 
 ```bash
-git clone https://github.com/Ivan0n/steeny-recode
-cd steeny-recode
-pip install flask
-python __main__.py
+npm install
+npm start
+```
+
+По умолчанию клиент подключается к production-серверу
+`https://music.steeny.fun/`. После авторизации backend сам направляет
+пользователя на `/home`. Для локальной разработки или другого сервера укажите
+адрес переменной окружения:
+
+```bash
+STEENY_URL=http://127.0.0.1:5000 npm start
+```
+
+Для запуска с открытыми DevTools:
+
+```bash
+npm run dev
+```
+
+## Проверка и сборка
+
+```bash
+npm run check
+npm test
+npm run pack
+```
+
+Готовые дистрибутивы создаются в `dist/`:
+
+```bash
+npm run dist:linux
+npm run dist:win
+```
+
+Windows-сборку рекомендуется запускать на Windows или в CI с Windows runner.
+На Linux можно запустить AppImage напрямую или установить `.deb`/`.rpm`:
+
+```bash
+chmod +x dist/STEENY-linux-*.AppImage
+./dist/STEENY-linux-*.AppImage
+
+sudo apt install ./dist/STEENY-*-linux-*.deb
+sudo dnf install ./dist/STEENY-*-linux-*.rpm
+```
+
+## Автоматические обновления
+
+Клиент проверяет официальный
+[GitHub Releases](https://github.com/Ivan0n/SteenyClient/releases) через 12
+секунд после запуска, при выходе компьютера из сна и затем каждые четыре часа.
+
+- Windows NSIS: обновление загружается в фоне и устанавливается после
+  подтверждённого перезапуска.
+- Linux AppImage: файл обновляется на месте, если каталог доступен пользователю
+  для записи. Сборка использует современный статический runtime без зависимости
+  от FUSE2 и без отключения Chromium sandbox.
+- Linux DEB/RPM: клиент сообщает о новой версии и открывает официальный пакет;
+  установка выполняется через `apt`/`dnf`, без небезопасного привилегированного
+  автоустановщика.
+
+Состояние и ручная проверка доступны в `Настройки → Обновления` и в меню трея.
+
+Для работы updater каждый опубликованный релиз обязан содержать одновременно:
+
+- `STEENY-…-windows-…-setup.exe`, его `.blockmap` и `latest.yml`;
+- `STEENY-linux-….AppImage`, DEB, RPM и `latest-linux.yml`.
+
+Workflow `.github/workflows/release.yml` собирает обе платформы и публикует
+полный набор только для тега, совпадающего с `version`:
+
+```bash
+git tag v2.1.0
+git push origin v2.1.0
+```
+
+Релиз сначала создаётся как draft, файлы загружаются одной группой, и только
+после этого он становится Latest. Номер уже опубликованной версии нельзя
+переиспользовать — для исправления нужно повысить SemVer.
+
+Windows Setup публикуется без подписи и не требует сертификата или GitHub
+Secrets. При первом запуске Windows может показать предупреждение SmartScreen
+и «Неизвестный издатель» — это ожидаемо для неподписанных приложений. Токен
+GitHub не встраивается в приложение: публичные обновления скачиваются без него.
+
+Когда появится сертификат, включите `forceCodeSigning: true` и передайте
+`WIN_CSC_LINK` и `WIN_CSC_KEY_PASSWORD` в Windows job.
+
+## Безопасность
+
+- Node.js не доступен коду страницы (`nodeIntegration: false`).
+- Интерфейс получает только ограниченный API через изолированный preload.
+- Главное окно может переходить только на origin, заданный в `STEENY_URL`.
+- Внешние HTTP/HTTPS-ссылки открываются системным браузером.
+- Разрешение media выдаётся только локальному интерфейсу и только для аудио.
+- DEB/RPM не устанавливаются через режим непроверенных привилегированных
+  пакетов.
+
+Сессия и cookies хранятся в отдельном постоянном Electron-профиле `steeny`.
+
+## Старый клиент
+
+Предыдущая реализация на PyQt сохранена в `legacy/` только для истории и
+аварийного отката. Основной клиент запускается командами npm.

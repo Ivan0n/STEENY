@@ -1,0 +1,148 @@
+name: Build and publish STEENY
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+      - id: version
+        shell: bash
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if [[ "$GITHUB_REF_TYPE" == "tag" && "$GITHUB_REF_NAME" != "v$VERSION" ]]; then
+            echo "Tag $GITHUB_REF_NAME does not match package version v$VERSION" >&2
+            exit 1
+          fi
+
+  windows:
+    needs: verify
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run dist:win
+      - uses: actions/upload-artifact@v4
+        with:
+          name: steeny-windows-${{ needs.verify.outputs.version }}
+          if-no-files-found: error
+          path: |
+            dist/*.exe
+            dist/*.exe.blockmap
+            dist/latest.yml
+
+  linux:
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install RPM build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes rpm
+      - run: npm run dist:linux
+      - uses: actions/upload-artifact@v4
+        with:
+          name: steeny-linux-${{ needs.verify.outputs.version }}
+          if-no-files-found: error
+          path: |
+            dist/*.AppImage
+            dist/*.deb
+            dist/*.rpm
+            dist/latest-linux.yml
+
+  release:
+    if: github.ref_type == 'tag'
+    needs: [verify, windows, linux]
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: steeny-*-${{ needs.verify.outputs.version }}
+          path: release
+          merge-multiple: true
+      - name: Verify release bundle
+        shell: bash
+        run: |
+          VERSION="${{ needs.verify.outputs.version }}"
+          shopt -s nullglob
+          WINDOWS_INSTALLERS=(release/STEENY-"$VERSION"-windows-*-setup.exe)
+          WINDOWS_BLOCKMAPS=(release/STEENY-"$VERSION"-windows-*-setup.exe.blockmap)
+          APPIMAGES=(release/STEENY-linux-*.AppImage)
+          DEBS=(release/STEENY-"$VERSION"-linux-*.deb)
+          RPMS=(release/STEENY-"$VERSION"-linux-*.rpm)
+          for files in \
+            WINDOWS_INSTALLERS WINDOWS_BLOCKMAPS APPIMAGES DEBS RPMS
+          do
+            declare -n matches="$files"
+            if [[ "${#matches[@]}" -ne 1 ]]; then
+              echo "Expected exactly one artifact in $files, found ${#matches[@]}" >&2
+              exit 1
+            fi
+          done
+          test -f release/latest.yml
+          test -f release/latest-linux.yml
+          grep -Fxq "version: $VERSION" release/latest.yml
+          grep -Fxq "version: $VERSION" release/latest-linux.yml
+          (
+            cd release
+            find . -maxdepth 1 -type f ! -name SHA256SUMS.txt \
+              -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt
+          )
+      - shell: bash
+        run: |
+          if gh release view "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1
+          then
+            IS_DRAFT="$(gh release view "$GITHUB_REF_NAME" \
+              --repo "$GITHUB_REPOSITORY" \
+              --json isDraft \
+              --jq .isDraft)"
+            if [[ "$IS_DRAFT" != "true" ]]; then
+              echo "Release $GITHUB_REF_NAME is already published; refusing to replace its assets." >&2
+              exit 1
+            fi
+          else
+            gh release create "$GITHUB_REF_NAME" \
+              --repo "$GITHUB_REPOSITORY" \
+              --verify-tag \
+              --title "STEENY ${{ needs.verify.outputs.version }}" \
+              --generate-notes \
+              --draft
+          fi
+          gh release upload "$GITHUB_REF_NAME" release/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
+          gh release edit "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --draft=false \
+            --latest
