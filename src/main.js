@@ -21,7 +21,9 @@ const { autoUpdater } = require('electron-updater');
 const { DiscordPresence } = require('./rpc');
 const { createUpdateManager } = require('./updater');
 
-const DEFAULT_APP_URL = 'https://music.steeny.fun/home'
+// The root route renders login for a new session and redirects an authenticated
+// user to `/home`. Starting there avoids an anonymous `/home` → `/` redirect.
+const DEFAULT_APP_URL = 'https://music.steeny.fun/'
 function resolveAppUrl(rawUrl) {
   try {
     const value = new URL(String(rawUrl || DEFAULT_APP_URL).trim());
@@ -37,6 +39,9 @@ function resolveAppUrl(rawUrl) {
 
 const APP_URL = resolveAppUrl(process.env.STEENY_URL);
 const APP_ORIGIN = new URL(APP_URL).origin;
+// `/home` redirects an anonymous user to the login page. Checking the origin
+// avoids treating that normal redirect as an unavailable production server.
+const BACKEND_CHECK_URL = new URL('/', APP_ORIGIN).href;
 const DEVTOOLS = process.env.STEENY_DEVTOOLS === '1'
   || process.argv.includes('--devtools');
 const SMOKE_TEST = process.argv.includes('--smoke-test');
@@ -136,12 +141,11 @@ function openExternal(rawUrl) {
 
 async function backendAvailable() {
   try {
-    const response = await net.fetch(APP_URL, {
+    const response = await net.fetch(BACKEND_CHECK_URL, {
       method: 'GET',
-      signal: AbortSignal.timeout(3000),
-      redirect: 'manual',
+      signal: AbortSignal.timeout(8000),
     });
-    return response.status >= 200 && response.status < 500;
+    return response.ok;
   } catch {
     return false;
   }
