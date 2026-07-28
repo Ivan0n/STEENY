@@ -5,6 +5,43 @@ const DiscordRPC = require('discord-rpc');
 const CLIENT_ID = '1395388116105429195';
 const UPDATE_DELAY_MS = 1200;
 const RECONNECT_DELAY_MS = 8000;
+const INVALID_RPC_PAYLOAD = 4000;
+
+function timestampValue(value) {
+  if (value instanceof Date) return Math.round(value.getTime());
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.round(number) : undefined;
+}
+
+function rawActivityPayload(activity, compatibilityLevel = 0) {
+  const timestamps = activity.startTimestamp || activity.endTimestamp
+    ? {
+        start: timestampValue(activity.startTimestamp),
+        end: timestampValue(activity.endTimestamp),
+      }
+    : undefined;
+  const assets = (
+    activity.largeImageKey || activity.largeImageText
+    || activity.smallImageKey || activity.smallImageText
+  ) ? {
+      large_image: activity.largeImageKey,
+      large_text: activity.largeImageText,
+      small_image: activity.smallImageKey,
+      small_text: activity.smallImageText,
+    } : undefined;
+  const payload = {
+    type: activity.type,
+    status_display_type: activity.statusDisplayType,
+    state: activity.state,
+    details: activity.details,
+    timestamps,
+    assets,
+    buttons: activity.buttons,
+    instance: !!activity.instance,
+  };
+  if (compatibilityLevel >= 1) delete payload.status_display_type;
+  return payload;
+}
 
 class DiscordPresence {
   constructor() {
@@ -16,6 +53,7 @@ class DiscordPresence {
     this.timer = null;
     this.reconnectTimer = null;
     this.lastFingerprint = '';
+    this.compatibilityLevel = 0;
   }
 
   connect() {
@@ -87,6 +125,8 @@ class DiscordPresence {
     const duration = Math.max(0, Number(data.duration) || 0);
     const now = Date.now();
     const activity = {
+      type: 2,
+      statusDisplayType: lyric.length >= 2 ? 1 : 2,
       details: title,
       state: lyric.length >= 2 ? lyric : artist || undefined,
       largeImageKey: cover.startsWith('https://') ? cover : 'prew',
@@ -114,13 +154,32 @@ class DiscordPresence {
     if (fingerprint === this.lastFingerprint) return;
 
     try {
-      await this.client.setActivity(activity);
+      await this.setActivity(activity);
       this.current = data;
       this.lastFingerprint = fingerprint;
     } catch {
       this.pending = data;
       this.handleDisconnect(this.client);
     }
+  }
+
+  async setActivity(activity) {
+    while (this.compatibilityLevel < 2) {
+      try {
+        await this.client.request('SET_ACTIVITY', {
+          pid: process.pid,
+          activity: rawActivityPayload(
+            activity,
+            this.compatibilityLevel,
+          ),
+        });
+        return;
+      } catch (error) {
+        if (Number(error?.code) !== INVALID_RPC_PAYLOAD) throw error;
+        this.compatibilityLevel += 1;
+      }
+    }
+    await this.client.setActivity(activity);
   }
 
   async clear() {
@@ -153,4 +212,4 @@ class DiscordPresence {
   }
 }
 
-module.exports = { DiscordPresence };
+module.exports = { DiscordPresence, rawActivityPayload };
