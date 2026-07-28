@@ -20,10 +20,11 @@ const {
 const { autoUpdater } = require('electron-updater');
 const { DiscordPresence } = require('./rpc');
 const { createUpdateManager } = require('./updater');
+const { createWindowResourceManager } = require('./window-resource-manager');
 
 // The root route renders login for a new session and redirects an authenticated
 // user to `/home`. Starting there avoids an anonymous `/home` → `/` redirect.
-const DEFAULT_APP_URL = 'https://music.steeny.fun/'
+const DEFAULT_APP_URL = 'https://music.steeny.fun/';
 function resolveAppUrl(rawUrl) {
   try {
     const value = new URL(String(rawUrl || DEFAULT_APP_URL).trim());
@@ -52,6 +53,8 @@ const offlineUrl = pathToFileURL(offlinePath).href;
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 app.commandLine.appendSwitch('disk-cache-size', String(50 * 1024 * 1024));
 app.commandLine.appendSwitch('media-cache-size', String(50 * 1024 * 1024));
+app.commandLine.appendSwitch('renderer-process-limit', '2');
+app.commandLine.appendSwitch('js-flags', '--optimize-for-size');
 app.commandLine.appendSwitch(
   'disable-features',
   'SpareRendererForSitePerProcess,BackForwardCache,AudioServiceOutOfProcess',
@@ -63,6 +66,7 @@ let quitting = false;
 let offlineLoaded = false;
 let updates = null;
 const rpc = new DiscordPresence();
+const resources = createWindowResourceManager();
 
 function validBounds(value) {
   if (!value || typeof value !== 'object') return null;
@@ -267,7 +271,7 @@ function createWindow() {
       sandbox: true,
       webSecurity: true,
       allowRunningInsecureContent: false,
-      backgroundThrottling: false,
+      backgroundThrottling: true,
       spellcheck: false,
       session: appSession,
     },
@@ -295,6 +299,7 @@ function createWindow() {
   mainWindow.webContents.on('will-attach-webview', event => event.preventDefault());
   mainWindow.webContents.on('did-finish-load', async () => {
     sendPowerState();
+    resources.sync();
     if (SMOKE_TEST) {
       let smokeState = null;
       try {
@@ -338,7 +343,10 @@ function createWindow() {
   });
 
   mainWindow.once('ready-to-show', () => {
-    if (!SMOKE_TEST) mainWindow.show();
+    if (!SMOKE_TEST) {
+      mainWindow.show();
+      resources.bind(mainWindow);
+    }
     if (DEVTOOLS) mainWindow.webContents.openDevTools({ mode: 'detach' });
   });
   mainWindow.on('close', event => {
@@ -354,6 +362,7 @@ function createWindow() {
   mainWindow.on('moved', saveWindowState);
   mainWindow.on('resized', saveWindowState);
   mainWindow.on('closed', () => {
+    resources.unbind();
     mainWindow = null;
   });
 
@@ -461,6 +470,7 @@ if (!app.requestSingleInstanceLock()) {
   });
   app.on('before-quit', () => {
     quitting = true;
+    resources.unbind();
     updates?.stop();
     saveWindowState();
     rpc.destroy();
