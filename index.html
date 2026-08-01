@@ -1,338 +1,478 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>steeny — стриминг музыки</title>
-    <meta name="description" content="steeny — стриминг музыки для честного прослушивания. Загружай, слушай, будь услышан.">
-    <link rel="icon" type="image/png" href="logo.jpg">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
 </head>
 <body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/nocturne-8b0b7d8c-ebb7-4591-8a10-abe6491f4209/styles.css" />
+<script src="_ds/nocturne-8b0b7d8c-ebb7-4591-8a10-abe6491f4209/_ds_bundle.js"></script>
+<style>
+  html, body { margin: 0; background: #0b0b0d; }
+  a { color: var(--color-accent); text-decoration: none; }
+  a:hover { color: var(--color-accent-300); }
+  ::selection { background: color-mix(in srgb, var(--color-accent) 30%, transparent); }
+  @keyframes st-caret { 0%, 49% { opacity: 1 } 50%, 100% { opacity: 0 } }
+  @keyframes st-hint { 0%, 100% { transform: translateY(0); opacity: .55 } 50% { transform: translateY(6px); opacity: 1 } }
+</style>
+</helmet>
 
-<div class="noise"></div>
-<canvas id="particles"></canvas>
-<div class="cursor-ring" id="cRing"></div>
-<div class="cursor-dot" id="cDot"></div>
+<div data-root style="position: relative; background: #0b0b0d; color: var(--color-text); font-family: var(--font-body); --color-bg: #0b0b0d; --color-surface: #17171b; --color-neutral-900: #1c1c21; --color-neutral-800: #2b2b32; --color-neutral-700: #4a4a55; --color-neutral-600: #6b6b78; --color-neutral-500: #8d8d9a; --color-accent: #9a8fe0; --color-accent-100: #f1efff; --color-accent-200: #d9d3f8; --color-accent-300: #bcb2ee; --color-accent-400: #a89ce7; --color-accent-500: #9a8fe0; --color-accent-600: #7a6dc4; --color-accent-700: #5a4f96; --color-accent-800: #3b3466; --color-accent-900: #241f3f; --color-accent-2: #e8a13a; --color-accent-2-100: #fdf0da; --color-accent-2-200: #f8d9a5; --color-accent-2-300: #f0bf6e; --color-accent-2-400: #eeb04f; --color-accent-2-500: #e8a13a; --color-accent-2-600: #c1802a; --color-accent-2-700: #8f5e1f; --color-accent-2-800: #5d3d15; --color-accent-2-900: #38260d;">
 
-<nav id="nav">
-    <div class="nav-brand">
-        <img class="nav-logo" src="logo.jpg" alt="steeny logo">
-        <span class="nav-name">steeny</span>
-        <span class="nav-tag">beta</span>
-    </div>
-    <ul class="nav-links">
-        <li><a href="#about">О проекте</a></li>
-        <li><a href="#features">Возможности</a></li>
-        <li><a href="#start">Начать</a></li>
-    </ul>
-    <a class="nav-cta" href="https://music.steeny.fun/" target="_blank" rel="noopener">Слушать</a>
-    <button class="menu-toggle" id="menuBtn" aria-label="Меню">
-        <span></span><span></span><span></span>
-    </button>
-</nav>
+  <div data-stage style="position: fixed; inset: 0; overflow: hidden;">
 
-<section class="hero">
-    <div class="hero-grid-bg"></div>
-    <div class="hero-glow"></div>
+    <div data-glow style="position: absolute; inset: -20%; pointer-events: none; background: radial-gradient(900px 620px at 78% 10%, color-mix(in srgb, var(--color-accent-900) 92%, transparent), transparent 62%), radial-gradient(680px 480px at 12% 84%, color-mix(in srgb, var(--color-accent-2-900) 78%, transparent), transparent 60%), radial-gradient(900px 700px at 4% 100%, color-mix(in srgb, black 40%, transparent), transparent 58%); will-change: transform;"></div>
 
-    <div class="hero-content">
-        <div class="hero-badge">
-            <span class="dot"></span>
-            Платформа честного стриминга
+    <div data-scenes style="position: absolute; inset: 0;">
+
+      <section data-scene="0" style="position: absolute; inset: 0; display: grid; align-content: center; padding: 92px clamp(72px, 8vw, 124px) 78px clamp(24px, 6vw, 88px); opacity: 0; will-change: transform, opacity;">
+        <div style="max-width: 1180px; width: 100%; margin: 0 auto;">
+          <h1 style="font-family: var(--font-heading); font-weight: 500; font-size: clamp(40px, 6vw, 82px); line-height: 1.08; letter-spacing: -0.02em; margin: 0 0 26px; margin-left: -0.06em;">
+            <span style="display: block;"><span data-l="ru">Три сервиса.</span><span data-l="en" style="display: none;">Three services.</span></span>
+            <span style="display: block; color: var(--color-neutral-400);"><span data-l="ru">Один плеер.</span><span data-l="en" style="display: none;">One player.</span></span>
+          </h1>
+          <p style="font-size: 17px; line-height: 28px; max-width: 54ch; margin: 0; color: color-mix(in srgb, var(--color-text) 80%, transparent);">
+            <span data-l="ru">Steeny собирает SoundCloud, YouTube Music и Яндекс Музыку в одно окно: Steeny AI to-text делает текст песни синхронным, слушать можно вдвоём, плейлисты вести вместе, а рекомендации собираются из ваших же треков.</span>
+            <span data-l="en" style="display: none;">Steeny brings SoundCloud, YouTube Music and Yandex Music into one window: Steeny AI to-text makes any lyrics synced, you can listen together, keep playlists together, and get recommendations built from your own tracks.</span>
+          </p>
+          <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-top: 30px;">
+            <a class="btn btn-primary" href="#download" style="min-height: 38px; padding: 9px 18px;"><span data-l="ru">Скачать клиент</span><span data-l="en" style="display: none;">Download the client</span></a>
+            <a class="btn btn-ghost" href="#download" style="min-height: 38px; padding: 9px 18px;"><span data-l="ru">Открыть в браузере</span><span data-l="en" style="display: none;">Open in browser</span></a>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px; margin-top: 56px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: color-mix(in srgb, var(--color-text) 45%, transparent); animation: st-hint 2.4s ease-in-out infinite;">
+            <span data-l="ru">Крутите вниз</span><span data-l="en" style="display: none;">Scroll down</span>
+            <svg width="12" height="18" viewBox="0 0 12 18" fill="none" aria-hidden="true"><path d="M6 1v15M1 11l5 5 5-5" stroke="currentColor" stroke-width="1.3"/></svg>
+          </div>
         </div>
+      </section>
 
-        <h1 class="hero-title">stee<span class="thin">ny</span></h1>
-
-        <p class="hero-sub">
-            Стриминг, где каждый артист может быть услышан. Загружай свою музыку, находи слушателей, открывай новые имена — без алгоритмической диктатуры и рекламных пауз.
-        </p>
-
-        <div class="hero-actions">
-            <a class="btn-main" href="https://music.steeny.fun/" target="_blank" rel="noopener">
-                <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                Слушать
-            </a>
-            <a class="btn-ghost" href="https://github.com/Ivan0n/STEENY/releases/" target="_blank" rel="noopener">
-                <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-                Скачать
-            </a>
+      <section data-scene="1" style="position: absolute; inset: 0; display: grid; align-content: center; padding: 92px clamp(72px, 8vw, 124px) 78px clamp(24px, 6vw, 88px); opacity: 0; will-change: transform, opacity;">
+        <div style="max-width: 1180px; width: 100%; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 56px; align-items: center;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 14px; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-accent); margin-bottom: 18px;"><span style="width: 44px; height: 1px; background: var(--color-accent); display: block;"></span><span>01</span><span data-l="ru">Библиотека</span><span data-l="en" style="display: none;">Library</span></div>
+            <h2 style="font-family: var(--font-heading); font-weight: 500; font-size: clamp(30px, 3.6vw, 46px); line-height: 1.12; letter-spacing: -0.015em; margin: 0 0 20px;"><span data-l="ru">Одна библиотека вместо трёх</span><span data-l="en" style="display: none;">One library instead of three</span></h2>
+            <p style="font-size: 16px; line-height: 27px; max-width: 46ch; margin: 0; color: color-mix(in srgb, var(--color-text) 78%, transparent);"><span data-l="ru">Треки из SoundCloud, YouTube Music и Яндекс Музыки сходятся в одну очередь, а тексты подтягиваются из Genius и LRCLIB. Не важно, откуда песня — она просто играет следующей.</span><span data-l="en" style="display: none;">Tracks from SoundCloud, YouTube Music and Yandex Music collapse into one queue, and lyrics come in from Genius and LRCLIB. It does not matter where a song is from — it just plays next.</span></p>
+          </div>
+          <div style="position: relative; height: clamp(280px, 46vh, 420px);">
+            <div data-merge style="position: absolute; inset: 0;">
+              <div data-src data-x="-186" data-y="-136" style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; align-items: center; gap: 9px; padding: 8px 15px; border-radius: 999px; border: 1px solid var(--color-neutral-800); background: var(--color-surface); font-size: 13px; white-space: nowrap;"><span style="width: 7px; height: 7px; border-radius: 50%; background: var(--color-accent); display: block;"></span>SoundCloud</div>
+              <div data-src data-x="196" data-y="-112" style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; align-items: center; gap: 9px; padding: 8px 15px; border-radius: 999px; border: 1px solid var(--color-neutral-800); background: var(--color-surface); font-size: 13px; white-space: nowrap;"><span style="width: 7px; height: 7px; border-radius: 50%; background: var(--color-accent); display: block;"></span>YouTube Music</div>
+              <div data-src data-x="-56" data-y="156" style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; align-items: center; gap: 9px; padding: 8px 15px; border-radius: 999px; border: 1px solid var(--color-neutral-800); background: var(--color-surface); font-size: 13px; white-space: nowrap;"><span style="width: 7px; height: 7px; border-radius: 50%; background: var(--color-accent); display: block;"></span>Яндекс Музыка</div>
+              <div data-src data-x="-214" data-y="46" style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; align-items: center; gap: 9px; padding: 8px 15px; border-radius: 999px; border: 1px solid var(--color-neutral-800); background: var(--color-surface); font-size: 13px; white-space: nowrap;"><span style="width: 7px; height: 7px; border-radius: 50%; background: var(--color-accent-2); display: block;"></span>Genius</div>
+              <div data-src data-x="200" data-y="82" style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; align-items: center; gap: 9px; padding: 8px 15px; border-radius: 999px; border: 1px solid var(--color-neutral-800); background: var(--color-surface); font-size: 13px; white-space: nowrap;"><span style="width: 7px; height: 7px; border-radius: 50%; background: var(--color-accent-2); display: block;"></span>LRCLIB</div>
+              <div data-core style="position: absolute; left: 50%; top: 50%; width: 168px; height: 168px; margin: -84px 0 0 -84px; border-radius: 50%; border: 1px solid var(--color-accent); box-shadow: 0 0 60px color-mix(in srgb, var(--color-accent) 22%, transparent); display: grid; place-items: center; opacity: 0;">
+                <span style="font-family: var(--font-heading); font-weight: 500; font-size: 19px; letter-spacing: -0.01em;">steeny</span>
+              </div>
+              <div data-ring style="position: absolute; left: 50%; top: 50%; width: 260px; height: 260px; margin: -130px 0 0 -130px; border-radius: 50%; border: 1px dashed color-mix(in srgb, var(--color-accent) 34%, transparent); opacity: 0;"></div>
+            </div>
+          </div>
         </div>
+      </section>
 
-        <div class="eq" aria-hidden="true" id="eqBars"></div>
+      <section data-scene="2" style="position: absolute; inset: 0; display: grid; align-content: center; padding: 92px clamp(72px, 8vw, 124px) 78px clamp(24px, 6vw, 88px); opacity: 0; will-change: transform, opacity;">
+        <div style="max-width: 1180px; width: 100%; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 56px; align-items: center;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 14px; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-accent); margin-bottom: 18px;"><span style="width: 44px; height: 1px; background: var(--color-accent); display: block;"></span><span>02</span><span data-l="ru">Steeny AI to-text</span><span data-l="en" style="display: none;">Steeny AI to-text</span></div>
+            <h2 style="font-family: var(--font-heading); font-weight: 500; font-size: clamp(30px, 3.6vw, 46px); line-height: 1.12; letter-spacing: -0.015em; margin: 0 0 20px;"><span data-l="ru">Обычный текст становится синхронным</span><span data-l="en" style="display: none;">Plain lyrics become synced lyrics</span></h2>
+            <p style="font-size: 16px; line-height: 27px; max-width: 46ch; margin: 0; color: color-mix(in srgb, var(--color-text) 78%, transparent);"><span data-l="ru">Источник нашёл текст, но без таймингов. Steeny AI to-text слушает сам трек, распознаёт звук и расставляет тайминги — строка в строку, прямо в плеере.</span><span data-l="en" style="display: none;">The source found the words but no timings. Steeny AI to-text listens to the track itself, recognises the audio and places the timings — line by line, right inside the player.</span></p>
+          </div>
+          <div>
+            <div style="display: flex; justify-content: flex-end; margin-bottom: clamp(6px, 1.6vh, 12px);">
+              <span style="display: inline-flex; align-items: center; gap: 8px; height: 34px; padding: 0 11px 0 14px; border-radius: 999px; border: 1px solid var(--color-accent-700); background: color-mix(in srgb, var(--color-accent) 13%, transparent); font-size: 11.5px; font-weight: 700; letter-spacing: 0.02em;">
+                <span>Steeny AI to-text</span>
+                <span style="min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: color-mix(in srgb, var(--color-accent) 20%, transparent); color: var(--color-accent-200); display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-feature-settings: 'tnum' 1;">3</span>
+                <svg width="10" height="6" viewBox="0 0 10 6" fill="none" aria-hidden="true"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.4"/></svg>
+              </span>
+            </div>
+            <div style="padding: 8px; border-radius: 14px; border: 1px solid var(--color-neutral-800); background: color-mix(in srgb, var(--color-surface) 82%, transparent); box-shadow: var(--shadow-md);">
+              <div style="padding: 7px 9px 8px; font-size: 10px; font-weight: 700; letter-spacing: 0.075em; text-transform: uppercase; color: var(--color-neutral-500);"><span data-l="ru">Найденные тексты</span><span data-l="en" style="display: none;">Lyrics found</span></div>
+              <div data-ai-row style="display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 10px; row-gap: 3px; padding: clamp(6px, 1.6vh, 10px) 11px; margin-bottom: 6px; border-radius: 11px; border: 1px solid var(--color-accent-700); background: color-mix(in srgb, var(--color-accent) 11%, transparent);">
+                <span style="font-size: 12.5px; font-weight: 700; color: var(--color-accent-200);">Steeny AI to-text</span>
+                <span data-ai-kind style="font-size: 12.5px; font-weight: 700; color: var(--color-accent-200); text-align: right;">Синхронизировать текст</span>
+                <span data-ai-hint style="grid-column: 1 / -1; font-size: 11.5px; color: var(--color-neutral-500);">Распознаём звук и расставляем тайминги</span>
+              </div>
+              <div style="display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 10px; row-gap: 2px; padding: clamp(5px, 1.4vh, 9px) 11px; border-radius: 11px;">
+                <span style="font-size: 12.5px; font-weight: 700;">Genius</span>
+                <span style="font-size: 12.5px; color: var(--color-neutral-500);"><span data-l="ru">Обычный</span><span data-l="en" style="display: none;">Plain</span></span>
+                <span style="grid-column: 1 / -1; font-size: 11.5px; color: var(--color-neutral-600);">Скриптонит — Положение</span>
+              </div>
+              <div style="display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 10px; row-gap: 2px; padding: clamp(5px, 1.4vh, 9px) 11px; border-radius: 11px;">
+                <span style="font-size: 12.5px; font-weight: 700;">LRCLIB</span>
+                <span style="font-size: 12.5px; color: var(--color-neutral-500);"><span data-l="ru">Обычный</span><span data-l="en" style="display: none;">Plain</span></span>
+                <span style="grid-column: 1 / -1; font-size: 11.5px; color: var(--color-neutral-600);">Скриптонит — Положение</span>
+              </div>
+            </div>
+            <div data-lyrics style="display: grid; gap: 1px; margin-top: clamp(8px, 2vh, 16px); text-align: center;">
+              <span data-line data-t="1:12" style="display: block; font-size: clamp(13px, 2.5vh, 15px); font-weight: 600; line-height: 1.4; padding: clamp(2px, 0.8vh, 5px) 14px; border-radius: 12px; color: color-mix(in srgb, var(--color-text) 30%, transparent); filter: blur(1.3px);">и город снова не спит</span>
+              <span data-line data-t="1:16" style="display: block; font-size: clamp(13px, 2.5vh, 15px); font-weight: 600; line-height: 1.4; padding: clamp(2px, 0.8vh, 5px) 14px; border-radius: 12px; color: color-mix(in srgb, var(--color-text) 30%, transparent); filter: blur(1.3px);">фонари делят ночь пополам</span>
+              <span data-line data-t="1:21" style="display: block; font-size: clamp(13px, 2.5vh, 15px); font-weight: 600; line-height: 1.4; padding: clamp(2px, 0.8vh, 5px) 14px; border-radius: 12px; color: color-mix(in srgb, var(--color-text) 30%, transparent); filter: blur(1.3px);">я слышу этот бит в тишине</span>
+              <span data-line data-t="1:25" style="display: block; font-size: clamp(13px, 2.5vh, 15px); font-weight: 600; line-height: 1.4; padding: clamp(2px, 0.8vh, 5px) 14px; border-radius: 12px; color: color-mix(in srgb, var(--color-text) 30%, transparent); filter: blur(1.3px);">и всё встаёт на свои места</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section data-scene="3" style="position: absolute; inset: 0; display: grid; align-content: center; padding: 92px clamp(72px, 8vw, 124px) 78px clamp(24px, 6vw, 88px); opacity: 0; will-change: transform, opacity;">
+        <div style="max-width: 1180px; width: 100%; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 56px; align-items: center;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 14px; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-accent); margin-bottom: 18px;"><span style="width: 44px; height: 1px; background: var(--color-accent); display: block;"></span><span>03</span><span data-l="ru">Вместе</span><span data-l="en" style="display: none;">Together</span></div>
+            <h2 style="font-family: var(--font-heading); font-weight: 500; font-size: clamp(30px, 3.6vw, 46px); line-height: 1.12; letter-spacing: -0.015em; margin: 0 0 20px;"><span data-l="ru">Слушаем вместе, секунда в секунду</span><span data-l="en" style="display: none;">Listen together, second by second</span></h2>
+            <p style="font-size: 16px; line-height: 27px; max-width: 46ch; margin: 0; color: color-mix(in srgb, var(--color-text) 78%, transparent);"><span data-l="ru">Комната на двоих или на компанию: одна очередь, один плейхед, общий чат. Кто угодно ставит на паузу — пауза у всех.</span><span data-l="en" style="display: none;">A room for two or for a crowd: one queue, one playhead, one chat. Anyone hits pause — everyone pauses.</span></p>
+          </div>
+          <div style="border: 1px solid var(--color-neutral-800); border-radius: 12px; background: color-mix(in srgb, var(--color-surface) 62%, transparent); padding: 22px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
+              <span data-peer style="width: 28px; height: 28px; border-radius: 50%; background: var(--color-accent-700); display: block;"></span>
+              <span data-peer style="width: 28px; height: 28px; border-radius: 50%; background: var(--color-accent-2-700); margin-left: -12px; display: block;"></span>
+              <span class="tag tag-accent" style="margin-left: 6px;"><span data-l="ru">в комнате · 2</span><span data-l="en" style="display: none;">in room · 2</span></span>
+            </div>
+            <div data-bars style="position: relative; display: flex; align-items: flex-end; gap: 3px; height: 96px;"></div>
+            <div style="display: flex; justify-content: space-between; font-size: 12px; color: var(--color-neutral-500); margin-top: 12px; font-feature-settings: 'tnum' 1;"><span data-time>0:00</span><span>3:42</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section data-scene="4" style="position: absolute; inset: 0; display: grid; align-content: center; padding: 92px clamp(72px, 8vw, 124px) 78px clamp(24px, 6vw, 88px); opacity: 0; will-change: transform, opacity;">
+        <div style="max-width: 1180px; width: 100%; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 56px; align-items: center;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 14px; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-accent); margin-bottom: 18px;"><span style="width: 44px; height: 1px; background: var(--color-accent); display: block;"></span><span>04</span><span data-l="ru">Плейлисты</span><span data-l="en" style="display: none;">Playlists</span></div>
+            <h2 style="font-family: var(--font-heading); font-weight: 500; font-size: clamp(30px, 3.6vw, 46px); line-height: 1.12; letter-spacing: -0.015em; margin: 0 0 20px;"><span data-l="ru">Плейлист, который ведёте вдвоём</span><span data-l="en" style="display: none;">A playlist you keep together</span></h2>
+            <p style="font-size: 16px; line-height: 27px; max-width: 46ch; margin: 0; color: color-mix(in srgb, var(--color-text) 78%, transparent);"><span data-l="ru">Добавляйте треки в один список из разных сервисов и с разных устройств. Видно, кто что принёс и когда.</span><span data-l="en" style="display: none;">Add tracks to one list from different services and devices. You can see who brought what, and when.</span></p>
+          </div>
+          <div style="display: grid; gap: 6px;">
+            <div data-row style="display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 14px; padding: 11px 14px; border-radius: 8px; background: color-mix(in srgb, var(--color-surface) 60%, transparent); opacity: 0;"><span style="font-size: 12px; color: var(--color-neutral-600); font-feature-settings: 'tnum' 1;">01</span><span style="font-size: 14.5px;">Скриптонит — Положение</span><span style="width: 20px; height: 20px; border-radius: 50%; background: var(--color-accent-700);"></span></div>
+            <div data-row style="display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 14px; padding: 11px 14px; border-radius: 8px; background: color-mix(in srgb, var(--color-surface) 60%, transparent); opacity: 0;"><span style="font-size: 12px; color: var(--color-neutral-600); font-feature-settings: 'tnum' 1;">02</span><span style="font-size: 14.5px;">MACAN — Кино</span><span style="width: 20px; height: 20px; border-radius: 50%; background: var(--color-accent-2-700);"></span></div>
+            <div data-row style="display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 14px; padding: 11px 14px; border-radius: 8px; background: color-mix(in srgb, var(--color-surface) 60%, transparent); opacity: 0;"><span style="font-size: 12px; color: var(--color-neutral-600); font-feature-settings: 'tnum' 1;">03</span><span style="font-size: 14.5px;">Miyagi &amp; Andy Panda — Kosandra</span><span style="width: 20px; height: 20px; border-radius: 50%; background: var(--color-accent-700);"></span></div>
+            <div data-row style="display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 14px; padding: 11px 14px; border-radius: 8px; background: color-mix(in srgb, var(--color-surface) 60%, transparent); opacity: 0;"><span style="font-size: 12px; color: var(--color-neutral-600); font-feature-settings: 'tnum' 1;">04</span><span style="font-size: 14.5px;">Три дня дождя — Демоны</span><span style="width: 20px; height: 20px; border-radius: 50%; background: var(--color-accent-2-700);"></span></div>
+            <div data-row style="display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 14px; padding: 11px 14px; border-radius: 8px; background: color-mix(in srgb, var(--color-surface) 60%, transparent); opacity: 0;"><span style="font-size: 12px; color: var(--color-neutral-600); font-feature-settings: 'tnum' 1;">05</span><span style="font-size: 14.5px;">OG Buda — Мокрый асфальт</span><span style="width: 20px; height: 20px; border-radius: 50%; background: var(--color-accent-700);"></span></div>
+          </div>
+        </div>
+      </section>
+
+      <section data-scene="5" style="position: absolute; inset: 0; display: grid; align-content: center; padding: 92px clamp(72px, 8vw, 124px) 78px clamp(24px, 6vw, 88px); opacity: 0; will-change: transform, opacity;">
+        <div style="max-width: 1180px; width: 100%; margin: 0 auto;">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 56px; align-items: center;">
+            <div>
+              <div style="display: flex; align-items: center; gap: 14px; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-accent); margin-bottom: 18px;"><span style="width: 44px; height: 1px; background: var(--color-accent); display: block;"></span><span>05</span><span data-l="ru">Рекомендации</span><span data-l="en" style="display: none;">Recommendations</span></div>
+              <h2 style="font-family: var(--font-heading); font-weight: 500; font-size: clamp(30px, 3.6vw, 46px); line-height: 1.12; letter-spacing: -0.015em; margin: 0 0 20px;"><span data-l="ru">Рекомендации из того, что вы уже любите</span><span data-l="en" style="display: none;">Recommendations from what you already love</span></h2>
+              <p style="font-size: 16px; line-height: 27px; max-width: 46ch; margin: 0; color: color-mix(in srgb, var(--color-text) 78%, transparent);"><span data-l="ru">Откройте любой плейлист — Steeny подберёт к нему похожее. А на главной соберёт подборку из ваших любимых треков, по всем сервисам сразу.</span><span data-l="en" style="display: none;">Open any playlist and Steeny suggests more like it. On the home screen it builds a set out of your favourite tracks, across every service at once.</span></p>
+            </div>
+            <div>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;">
+                <span data-seed class="tag tag-outline"><span data-l="ru">Плейлист «Ночной рейс»</span><span data-l="en" style="display: none;">Playlist “Night Ride”</span></span>
+                <span data-seed class="tag tag-outline"><span data-l="ru">Любимые треки</span><span data-l="en" style="display: none;">Liked tracks</span></span>
+              </div>
+              <div style="display: grid; gap: 6px;">
+                <div data-rec style="display: grid; grid-template-columns: 34px 1fr auto; align-items: center; gap: 12px; padding: 10px 13px; border-radius: 8px; background: color-mix(in srgb, var(--color-surface) 60%, transparent); opacity: 0;"><span style="width: 34px; height: 34px; border-radius: 5px; background: var(--color-neutral-900); display: block;"></span><span style="display: grid; gap: 2px; min-width: 0;"><span style="font-size: 14px;">ЛСП — Тело</span><span style="font-size: 11.5px; color: var(--color-neutral-500);">похоже на «Ночной рейс»</span></span><span style="font-size: 11.5px; color: var(--color-accent-2-300); font-feature-settings: 'tnum' 1;">94%</span></div>
+                <div data-rec style="display: grid; grid-template-columns: 34px 1fr auto; align-items: center; gap: 12px; padding: 10px 13px; border-radius: 8px; background: color-mix(in srgb, var(--color-surface) 60%, transparent); opacity: 0;"><span style="width: 34px; height: 34px; border-radius: 5px; background: var(--color-neutral-900); display: block;"></span><span style="display: grid; gap: 2px; min-width: 0;"><span style="font-size: 14px;">Мукка — Девочка с каре</span><span style="font-size: 11.5px; color: var(--color-neutral-500);">из ваших любимых</span></span><span style="font-size: 11.5px; color: var(--color-accent-2-300); font-feature-settings: 'tnum' 1;">91%</span></div>
+                <div data-rec style="display: grid; grid-template-columns: 34px 1fr auto; align-items: center; gap: 12px; padding: 10px 13px; border-radius: 8px; background: color-mix(in srgb, var(--color-surface) 60%, transparent); opacity: 0;"><span style="width: 34px; height: 34px; border-radius: 5px; background: var(--color-neutral-900); display: block;"></span><span style="display: grid; gap: 2px; min-width: 0;"><span style="font-size: 14px;">i61 — Пятница</span><span style="font-size: 11.5px; color: var(--color-neutral-500);">похоже на «Ночной рейс»</span></span><span style="font-size: 11.5px; color: var(--color-accent-2-300); font-feature-settings: 'tnum' 1;">88%</span></div>
+                <div data-rec style="display: grid; grid-template-columns: 34px 1fr auto; align-items: center; gap: 12px; padding: 10px 13px; border-radius: 8px; background: color-mix(in srgb, var(--color-surface) 60%, transparent); opacity: 0;"><span style="width: 34px; height: 34px; border-radius: 5px; background: var(--color-neutral-900); display: block;"></span><span style="display: grid; gap: 2px; min-width: 0;"><span style="font-size: 14px;">SALUKI — Черника</span><span style="font-size: 11.5px; color: var(--color-neutral-500);">из ваших любимых</span></span><span style="font-size: 11.5px; color: var(--color-accent-2-300); font-feature-settings: 'tnum' 1;">85%</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section data-scene="6" style="position: absolute; inset: 0; display: grid; align-content: center; padding: 92px clamp(72px, 8vw, 124px) 78px clamp(24px, 6vw, 88px); opacity: 0; will-change: transform, opacity;">
+        <div style="max-width: 1180px; width: 100%; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 56px; align-items: center;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 14px; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-accent); margin-bottom: 18px;"><span style="width: 44px; height: 1px; background: var(--color-accent); display: block;"></span><span>06</span><span data-l="ru">Интерфейс</span><span data-l="en" style="display: none;">Interface</span></div>
+            <h2 style="font-family: var(--font-heading); font-weight: 500; font-size: clamp(30px, 3.6vw, 46px); line-height: 1.12; letter-spacing: -0.015em; margin: 0 0 20px;"><span data-l="ru">Интерфейс собирается под вас</span><span data-l="en" style="display: none;">The interface assembles around you</span></h2>
+            <p style="font-size: 16px; line-height: 27px; max-width: 46ch; margin: 0; color: color-mix(in srgb, var(--color-text) 78%, transparent);"><span data-l="ru">Акцент, плотность, состав панелей и порядок блоков — всё меняется на лету и запоминается на всех устройствах.</span><span data-l="en" style="display: none;">Accent, density, which panels exist and in what order — all of it changes live and follows you across devices.</span></p>
+          </div>
+          <div data-frame style="--acc: var(--color-accent); border: 1px solid var(--color-neutral-800); border-radius: 12px; overflow: hidden; background: color-mix(in srgb, var(--color-surface) 62%, transparent);">
+            <div style="display: flex; align-items: center; gap: 8px; padding: 11px 14px; border-bottom: 1px solid var(--color-neutral-900);">
+              <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--acc); display: block;"></span>
+              <span style="font-size: 12.5px; color: var(--color-neutral-500);">steeny</span>
+              <span data-chip style="margin-left: auto; height: 6px; width: 54px; border-radius: 3px; background: var(--acc); opacity: .5; display: block;"></span>
+            </div>
+            <div data-frame-body style="display: grid; grid-template-columns: 96px 1fr; gap: 12px; padding: 14px;">
+              <div data-panel style="display: grid; gap: 7px; align-content: start;">
+                <span style="height: 9px; border-radius: 3px; background: var(--acc); opacity: .75; display: block;"></span>
+                <span style="height: 9px; border-radius: 3px; background: var(--color-neutral-800); display: block;"></span>
+                <span style="height: 9px; border-radius: 3px; background: var(--color-neutral-800); display: block;"></span>
+                <span style="height: 9px; border-radius: 3px; background: var(--color-neutral-800); display: block;"></span>
+              </div>
+              <div data-grid style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                <span data-tile style="aspect-ratio: 1; border-radius: 7px; background: var(--color-neutral-900); display: block;"></span>
+                <span data-tile style="aspect-ratio: 1; border-radius: 7px; background: var(--color-neutral-900); display: block;"></span>
+                <span data-tile style="aspect-ratio: 1; border-radius: 7px; background: var(--color-neutral-900); display: block;"></span>
+                <span data-tile style="aspect-ratio: 1; border-radius: 7px; background: var(--color-neutral-900); display: block;"></span>
+                <span data-tile style="aspect-ratio: 1; border-radius: 7px; background: var(--color-neutral-900); display: block;"></span>
+                <span data-tile style="aspect-ratio: 1; border-radius: 7px; background: var(--color-neutral-900); display: block;"></span>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-top: 1px solid var(--color-neutral-900);">
+              <span style="width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--acc); display: block;"></span>
+              <span data-seek style="flex: 1; height: 3px; border-radius: 2px; background: linear-gradient(to right, var(--acc) 0%, var(--acc) 38%, var(--color-neutral-800) 38%); display: block;"></span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section data-scene="7" style="position: absolute; inset: 0; display: grid; align-content: center; padding: 92px clamp(72px, 8vw, 124px) 78px clamp(24px, 6vw, 88px); opacity: 0; will-change: transform, opacity;">
+        <div style="max-width: 1180px; width: 100%; margin: 0 auto;">
+          <div style="display: flex; align-items: center; gap: 14px; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-accent); margin-bottom: 18px;"><span style="width: 44px; height: 1px; background: var(--color-accent); display: block;"></span><span>07</span><span data-l="ru">Скорость</span><span data-l="en" style="display: none;">Speed</span></div>
+          <h2 style="font-family: var(--font-heading); font-weight: 500; font-size: clamp(30px, 3.6vw, 46px); line-height: 1.12; letter-spacing: -0.015em; margin: 0 0 clamp(12px, 3vh, 24px); max-width: 20ch;"><span data-l="ru">Лёгкий там, где остальные тяжёлые</span><span data-l="en" style="display: none;">Light where the others are heavy</span></h2>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: clamp(12px, 3vh, 18px) 40px; margin-bottom: clamp(14px, 3vh, 26px);">
+            <div><p data-stat data-val="0.7" data-dec="1" data-suffix=" с" data-suffix-en=" s" style="font-family: var(--font-heading); font-weight: 500; font-size: clamp(30px, 3vw, 46px); line-height: 1.1; margin: 0; color: var(--color-accent-2); font-feature-settings: 'tnum' 1;">0</p><p style="font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; color: color-mix(in srgb, var(--color-text) 60%, transparent); margin: 8px 0 0;"><span data-l="ru">Холодный старт</span><span data-l="en" style="display: none;">Cold start</span></p></div>
+            <div><p data-stat data-val="300" data-dec="0" data-suffix=" МБ" data-suffix-en=" MB" style="font-family: var(--font-heading); font-weight: 500; font-size: clamp(30px, 3vw, 46px); line-height: 1.1; margin: 0; color: var(--color-accent-2); font-feature-settings: 'tnum' 1;">0</p><p style="font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; color: color-mix(in srgb, var(--color-text) 60%, transparent); margin: 8px 0 0;"><span data-l="ru">Память в фоне</span><span data-l="en" style="display: none;">Idle memory</span></p></div>
+            <div><p data-stat data-val="3" data-dec="0" data-suffix="" data-suffix-en="" style="font-family: var(--font-heading); font-weight: 500; font-size: clamp(30px, 3vw, 46px); line-height: 1.1; margin: 0; color: var(--color-accent-2); font-feature-settings: 'tnum' 1;">0</p><p style="font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; color: color-mix(in srgb, var(--color-text) 60%, transparent); margin: 8px 0 0;"><span data-l="ru">Источника музыки</span><span data-l="en" style="display: none;">Music sources</span></p></div>
+            <div><p data-stat data-val="60" data-dec="0" data-suffix=" fps" data-suffix-en=" fps" style="font-family: var(--font-heading); font-weight: 500; font-size: clamp(30px, 3vw, 46px); line-height: 1.1; margin: 0; color: var(--color-accent-2); font-feature-settings: 'tnum' 1;">0</p><p style="font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; color: color-mix(in srgb, var(--color-text) 60%, transparent); margin: 8px 0 0;"><span data-l="ru">На старом железе</span><span data-l="en" style="display: none;">On old hardware</span></p></div>
+          </div>
+          <div id="download" style="display: flex; align-items: center; justify-content: space-between; gap: 24px 32px; flex-wrap: wrap; padding-top: clamp(12px, 3vh, 22px); border-top: 1px solid var(--color-neutral-900);">
+            <div>
+              <h3 style="font-family: var(--font-heading); font-weight: 500; font-size: 21px; line-height: 1.25; margin: 0 0 6px;"><span data-l="ru">Заберите весь свой звук в одно окно</span><span data-l="en" style="display: none;">Bring all of your sound into one window</span></h3>
+              <p style="font-size: 14px; line-height: 22px; margin: 0; color: color-mix(in srgb, var(--color-text) 72%, transparent);"><span data-l="ru">Десктоп-клиент для Windows, macOS и Linux. Бесплатно, без рекламы.</span><span data-l="en" style="display: none;">Desktop client for Windows, macOS and Linux. Free, no ads.</span></p>
+            </div>
+            <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+              <a class="btn btn-primary" href="https://steeny.fun" style="min-height: 40px; padding: 10px 20px;"><span data-l="ru">Скачать десктоп-клиент</span><span data-l="en" style="display: none;">Download desktop client</span></a>
+            </div>
+          </div>
+        </div>
+      </section>
+
     </div>
 
-    <div class="scroll-hint">
-        <span>scroll</span>
-        <div class="line"></div>
-    </div>
-</section>
+    <nav style="position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 16px; padding: 20px clamp(24px, 6vw, 88px);">
+      <span style="font-family: var(--font-heading); font-weight: 500; font-size: 18px; letter-spacing: -0.01em; margin-right: auto; display: flex; align-items: center; gap: 10px;"><span style="width: 30px; height: 30px; display: block;"><x-import component-from-global-scope="image-slot" from="./image-slot.js" id="steeny-avatar" shape="rect" placeholder="Аватарка steeny" hint-size="30px,30px" style="width: 30px; height: 30px; display: block;"></x-import></span>steeny</span>
+      <button data-lang-toggle type="button" class="btn btn-secondary" style="min-height: 32px; padding: 6px 12px; font-size: 12.5px; letter-spacing: 0.04em;">RU / EN</button>
+      <a class="btn btn-primary" href="https://steeny.fun" style="min-height: 32px; padding: 6px 14px; font-size: 13px;"><span data-l="ru">Скачать</span><span data-l="en" style="display: none;">Download</span></a>
+    </nav>
 
+    <div data-rail style="position: absolute; right: clamp(16px, 3vw, 40px); top: 50%; transform: translateY(-50%); display: grid; gap: 14px; justify-items: end;"></div>
 
-<div class="marquee-wrap">
-    <div class="marquee-track" id="marquee">
-        <span>Будь услышан</span><span>◆</span>
-        <span>Загружай треки</span><span>◆</span>
-        <span>Без рекламы</span><span>◆</span>
-        <span>Живое сообщество</span><span>◆</span>
-        <span>Независимые артисты</span><span>◆</span>
-        <span>Будь услышан</span><span>◆</span>
-        <span>Загружай треки</span><span>◆</span>
-        <span>Без рекламы</span><span>◆</span>
-        <span>Живое сообщество</span><span>◆</span>
+    <div style="position: absolute; left: clamp(24px, 6vw, 88px); bottom: 26px; display: flex; align-items: center; gap: 14px; font-size: 11.5px; letter-spacing: 0.1em; color: color-mix(in srgb, var(--color-text) 42%, transparent); font-feature-settings: 'tnum' 1;">
+      <span data-counter>01 / 08</span>
     </div>
+
+    <div style="position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: color-mix(in srgb, var(--color-text) 8%, transparent);">
+      <div data-progress style="height: 100%; width: 0%; background: var(--color-accent); box-shadow: 0 0 14px color-mix(in srgb, var(--color-accent) 70%, transparent);"></div>
+    </div>
+
+  </div>
+
+  <div data-track style="height: 800vh;"></div>
 </div>
 
-<!-- ABOUT -->
-<section id="about" class="sec-pad">
-    <div class="container">
-        <div class="reveal">
-            <p class="label">01 — О проекте</p>
-            <h2 class="sec-title">Каждый артист<br>заслуживает быть услышанным</h2>
-        </div>
-        <div class="about-grid">
-            <div class="about-text reveal">
-                <p>
-                    <strong>Steeny</strong> — это стриминговая платформа, где музыка не тонет в алгоритмах и рекламе. Здесь любой артист — от начинающего битмейкера до инди-группы из соседнего двора — может загрузить свой трек и быть услышанным.
-                </p>
-                <br>
-                <p>
-                    Мы не решаем за вас, что слушать. Никаких накруток, никаких «продвигаемых» треков. Только <strong>честное прослушивание</strong> — настоящие люди открывают настоящую музыку.
-                </p>
-            </div>
-            <div class="about-visual reveal">
-                <div class="vinyl-wrap">
-                    <div class="vinyl">
-                        <div class="vinyl-ring" style="width:240px;height:240px"></div>
-                        <div class="vinyl-ring" style="width:200px;height:200px"></div>
-                        <div class="vinyl-ring" style="width:160px;height:160px"></div>
-                        <div class="vinyl-label"><img src="logo.jpg" alt=""></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;lang&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;ru&quot;,&quot;en&quot;],&quot;default&quot;:&quot;ru&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Content&quot;},&quot;sceneHold&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;min&quot;:70,&quot;max&quot;:200,&quot;step&quot;:10,&quot;default&quot;:110,&quot;unit&quot;:&quot;vh&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Motion&quot;}}">
+class Component extends DCLogic {
+  componentDidMount() {
+    this.root = document.querySelector('[data-root]');
+    if (!this.root) return;
+    this.lang = this.props.lang || 'ru';
+    this.scenes = Array.from(this.root.querySelectorAll('[data-scene]'));
+    this.N = this.scenes.length;
+    this.track = this.root.querySelector('[data-track]');
+    this.track.style.height = ((this.props.sceneHold ?? 110) * this.N) + 'vh';
+    this.buildBars();
+    this.buildRail();
+    this.applyLang();
+    const btn = this.root.querySelector('[data-lang-toggle]');
+    if (btn) btn.addEventListener('click', () => { this.lang = this.lang === 'ru' ? 'en' : 'ru'; this.applyLang(); this.update(); });
+    this.onScroll = () => { if (!this.queued) { this.queued = true; requestAnimationFrame(() => { this.queued = false; this.update(); }); } };
+    addEventListener('scroll', this.onScroll, { passive: true });
+    addEventListener('resize', this.onScroll);
+    this.update();
+  }
+  componentWillUnmount() { removeEventListener('scroll', this.onScroll); removeEventListener('resize', this.onScroll); }
 
-<!-- FEATURES -->
-<section id="features" class="features-section sec-pad">
-    <div class="container">
-        <div class="reveal">
-            <p class="label">02 — Возможности</p>
-            <h2 class="sec-title">Всё для артистов и слушателей</h2>
-        </div>
-        <div class="features-grid reveal">
-            <div class="feat-card">
-                <div class="feat-num">01</div>
-                <div class="feat-icon">🎤</div>
-                <h3 class="feat-title">Загружай свою музыку</h3>
-                <p class="feat-desc">Ты — артист? Загрузи треки, альбомы или синглы в пару кликов. Твоя музыка сразу доступна всему сообществу steeny.</p>
-            </div>
-            <div class="feat-card">
-                <div class="feat-num">02</div>
-                <div class="feat-icon">👁</div>
-                <h3 class="feat-title">Равные условия</h3>
-                <p class="feat-desc">Никаких «продвигаемых» треков и платного попадания в топы. У каждого артиста одинаковый шанс быть замеченным.</p>
-            </div>
-            <div class="feat-card">
-                <div class="feat-num">03</div>
-                <div class="feat-icon">🔍</div>
-                <h3 class="feat-title">Живое открытие музыки</h3>
-                <p class="feat-desc">Никаких алгоритмов, которые решают за вас. Находите новых артистов через сообщество, теги и реальные рекомендации.</p>
-            </div>
-            <div class="feat-card">
-                <div class="feat-num">04</div>
-                <div class="feat-icon">∞</div>
-                <h3 class="feat-title">Без рекламы</h3>
-                <p class="feat-desc">Никаких баннеров, аудиороликов и прерываний между треками. Чистое прослушивание — как должно быть.</p>
-            </div>
-            <div class="feat-card">
-                <div class="feat-num">05</div>
-                <div class="feat-icon">🤝</div>
-                <h3 class="feat-title">Сообщество</h3>
-                <p class="feat-desc">Комментарии, репосты, прямая связь с артистами. Steeny — это не витрина, а живая среда для тех, кто любит музыку.</p>
-            </div>
-            <div class="feat-card">
-                <div class="feat-num">06</div>
-                <div class="feat-icon">⚡</div>
-                <h3 class="feat-title">Быстро и минималистично</h3>
-                <p class="feat-desc">Лёгкий интерфейс без визуального шума. Музыка грузится мгновенно — слушайте, а не ждите.</p>
-            </div>
-        </div>
-    </div>
-</section>
-
-<!-- OSS BANNER -->
-<section class="oss-banner">
-    <div class="container">
-        <div class="oss-inner reveal">
-            <div class="oss-left">
-                <h3 class="oss-title">Открытый код клиента</h3>
-                <p class="oss-desc">Клиент steeny — Open Source: вы видите каждую строку кода, которая работает на вашем устройстве. Серверная часть закрыта — чтобы защитить данные артистов и ваши плейлисты от чужих рук.</p>
-            </div>
-            <a class="btn-ghost" href="https://github.com/Ivan0n/STEENY/" target="_blank" rel="noopener">
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 00-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0020 4.77 5.07 5.07 0 0019.91 1S18.73.65 16 2.48a13.38 13.38 0 00-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 005 4.77a5.44 5.44 0 00-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 009 18.13V22"/></svg>
-                GitHub
-            </a>
-        </div>
-    </div>
-</section>
-
-<!-- CTA -->
-<section class="cta" id="start">
-    <div class="cta-glow"></div>
-    <div class="reveal">
-        <p class="label">Присоединяйтесь к steeny</p>
-        <h2 class="sec-title">Слушай честно.<br>Создавай свободно.</h2>
-        <p class="cta-sub">Загрузи свой первый трек или открой для себя артистов, которых не покажет ни один алгоритм.</p>
-        <div class="cta-actions">
-            <a class="btn-main" href="https://music.steeny.fun/" target="_blank" rel="noopener">
-                <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                Открыть steeny
-            </a>
-            <a class="btn-ghost" href="https://github.com/Ivan0n/STEENY/releases/" target="_blank" rel="noopener">
-                <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-                Скачать приложение
-            </a>
-        </div>
-    </div>
-</section>
-
-<!-- MARQUEE 2 -->
-<div class="marquee-wrap">
-    <div class="marquee-track">
-        <span>steeny</span><span>◆</span>
-        <span>Слушай</span><span>◆</span>
-        <span>Загружай</span><span>◆</span>
-        <span>Открывай</span><span>◆</span>
-        <span>Будь услышан</span><span>◆</span>
-        <span>steeny</span><span>◆</span>
-        <span>Слушай</span><span>◆</span>
-        <span>Загружай</span><span>◆</span>
-        <span>Открывай</span><span>◆</span>
-        <span>Будь услышан</span><span>◆</span>
-        <span>steeny</span><span>◆</span>
-        <span>Слушай</span><span>◆</span>
-    </div>
-</div>
-
-<!-- FOOTER -->
-<footer>
-    <div class="foot-left">
-        © 2026 steeny.<br>
-        <a href="elua.html">Пользовательское соглашение</a>
-    </div>
-    <ul class="foot-links">
-        <li><a href="https://github.com/Ivan0n/STEENY/" target="_blank" rel="noopener">GitHub</a></li>
-        <li><a href="https://music.steeny.fun/" target="_blank" rel="noopener">Web App</a></li>
-    </ul>
-</footer>
-
-<script>
-/* Cursor */
-const ring = document.getElementById('cRing');
-const dot  = document.getElementById('cDot');
-let mx=0,my=0,rx=0,ry=0;
-
-document.addEventListener('mousemove', e=>{
-    mx=e.clientX; my=e.clientY;
-    dot.style.left=mx+'px'; dot.style.top=my+'px';
-});
-
-(function loop(){
-    rx+=(mx-rx)*.12; ry+=(my-ry)*.12;
-    ring.style.left=rx+'px'; ring.style.top=ry+'px';
-    requestAnimationFrame(loop);
-})();
-
-document.querySelectorAll('a, button, .feat-card').forEach(el=>{
-    el.addEventListener('mouseenter',()=>ring.classList.add('active'));
-    el.addEventListener('mouseleave',()=>ring.classList.remove('active'));
-});
-
-if('ontouchstart' in window){ ring.style.display='none'; dot.style.display='none'; }
-
-/* Particles */
-const cvs = document.getElementById('particles');
-const ctx = cvs.getContext('2d');
-let W, H, pts=[];
-
-function resize(){ W=cvs.width=innerWidth; H=cvs.height=innerHeight; }
-resize(); addEventListener('resize', resize);
-
-class P{
-    constructor(){this.reset();}
-    reset(){
-        this.x=Math.random()*W;
-        this.y=Math.random()*H;
-        this.r=Math.random()*1.2+.4;
-        this.vx=(Math.random()-.5)*.25;
-        this.vy=(Math.random()-.5)*.25;
-        this.o=Math.random()*.25+.04;
+  buildBars() {
+    const wrap = this.root.querySelector('[data-bars]');
+    if (!wrap || wrap.children.length) return;
+    for (let i = 0; i < 56; i++) {
+      const b = document.createElement('span');
+      const h = 18 + Math.abs(Math.sin(i * 0.7) * 44) + Math.abs(Math.sin(i * 0.21) * 30);
+      b.style.cssText = 'flex:1;border-radius:2px;display:block;background:var(--color-neutral-800);height:' + h.toFixed(0) + '%';
+      wrap.appendChild(b);
     }
-    update(){
-        this.x+=this.vx; this.y+=this.vy;
-        if(this.x<0||this.x>W||this.y<0||this.y>H) this.reset();
+    const head = document.createElement('span');
+    head.setAttribute('data-head', '');
+    head.style.cssText = 'position:absolute;top:-6px;bottom:-6px;width:1.5px;background:var(--color-accent);box-shadow:0 0 12px var(--color-accent);left:0';
+    wrap.appendChild(head);
+  }
+
+  buildRail() {
+    const rail = this.root.querySelector('[data-rail]');
+    if (!rail || rail.children.length) return;
+    this.railDots = [];
+    for (let i = 0; i < this.N; i++) {
+      const d = document.createElement('button');
+      d.type = 'button';
+      d.setAttribute('aria-label', 'scene ' + (i + 1));
+      d.style.cssText = 'width:22px;height:2px;border:0;padding:0;border-radius:2px;background:color-mix(in srgb,var(--color-text) 20%,transparent);cursor:pointer;transition:width .25s,background .25s';
+      d.addEventListener('click', () => {
+        const total = this.track.offsetHeight - innerHeight;
+        scrollTo({ top: (i / (this.N - 1)) * total, behavior: 'smooth' });
+      });
+      rail.appendChild(d);
+      this.railDots.push(d);
     }
-    draw(){
-        ctx.beginPath();
-        ctx.arc(this.x,this.y,this.r,0,Math.PI*2);
-        ctx.fillStyle=`rgba(255,255,255,${this.o})`;
-        ctx.fill();
-    }
+  }
+
+  applyLang() {
+    this.root.querySelectorAll('[data-l]').forEach((el) => {
+      el.style.display = el.dataset.l === this.lang ? '' : 'none';
+    });
+  }
+
+  update() {
+    const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+    const total = Math.max(1, this.track.offsetHeight - innerHeight);
+    const prog = clamp(scrollY / total, 0, 1);
+    const t = prog * (this.N - 1);
+
+    const bar = this.root.querySelector('[data-progress]');
+    if (bar) bar.style.width = (prog * 100).toFixed(2) + '%';
+    const glow = this.root.querySelector('[data-glow]');
+    if (glow) glow.style.transform = 'translate3d(' + (-prog * 140).toFixed(1) + 'px,' + (prog * 90).toFixed(1) + 'px,0)';
+    const counter = this.root.querySelector('[data-counter]');
+    const active = Math.round(t);
+    if (counter) counter.textContent = String(active + 1).padStart(2, '0') + ' / ' + String(this.N).padStart(2, '0');
+    if (this.railDots) this.railDots.forEach((d, i) => {
+      const on = i === active;
+      d.style.width = on ? '40px' : '22px';
+      d.style.background = on ? 'var(--color-accent)' : 'color-mix(in srgb,var(--color-text) 20%,transparent)';
+    });
+
+    this.scenes.forEach((sc, i) => {
+      const d = t - i;
+      const ad = Math.abs(d);
+      const a = clamp(1 - ad, 0, 1);
+      const e = a * a * (3 - 2 * a);
+      sc.style.opacity = e.toFixed(3);
+      sc.style.transform = 'translate3d(0,' + (-d * 64).toFixed(1) + 'px,0) scale(' + (1 - ad * 0.05).toFixed(4) + ')';
+      sc.style.pointerEvents = ad < 0.45 ? 'auto' : 'none';
+      sc.style.visibility = ad >= 1 ? 'hidden' : 'visible';
+      if (ad >= 1) return;
+      const p = clamp((d + 1) / 1.55, 0, 1);
+      const fn = this['scene' + i];
+      if (fn) fn.call(this, sc, p, e);
+    });
+  }
+
+  scene1(sc, p) {
+    const q = Math.max(0, Math.min(1, (p - 0.58) / 0.42));
+    const k = 1 - (q * q * (3 - 2 * q));
+    const box = sc.querySelector('[data-merge]');
+    const bw = box ? box.clientWidth : 420;
+    const bh = box ? box.clientHeight : 420;
+    sc.querySelectorAll('[data-src]').forEach((el) => {
+      const ox = Number(el.dataset.x);
+      const oy = Number(el.dataset.y);
+      const maxX = Math.max(40, bw / 2 - el.offsetWidth / 2 - 4);
+      const maxY = Math.max(40, bh / 2 - el.offsetHeight / 2 - 4);
+      const s = Math.min(1, maxX / Math.abs(ox || 1), maxY / Math.abs(oy || 1));
+      const x = ox * s * k;
+      const y = oy * s * k;
+      el.style.transform = 'translate(-50%,-50%) translate(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px) scale(' + (0.7 + 0.3 * k).toFixed(3) + ')';
+      el.style.opacity = (0.25 + 0.75 * k).toFixed(3);
+    });
+    const core = sc.querySelector('[data-core]');
+    if (core) { core.style.opacity = Math.max(0, (p - 0.6) / 0.3).toFixed(3); core.style.transform = 'scale(' + (0.72 + 0.28 * (1 - k)).toFixed(3) + ')'; }
+    const ring = sc.querySelector('[data-ring]');
+    if (ring) { ring.style.opacity = Math.max(0, (p - 0.7) / 0.3).toFixed(3); ring.style.transform = 'rotate(' + (p * 90).toFixed(1) + 'deg)'; }
+  }
+
+  scene2(sc, p) {
+    const ru = this.lang !== 'en';
+    const kindEl = sc.querySelector('[data-ai-kind]');
+    const hintEl = sc.querySelector('[data-ai-hint]');
+    const phase = p < 0.28 ? 0 : p < 0.55 ? 1 : 2;
+    if (kindEl) kindEl.textContent = ru
+      ? ['Синхронизировать текст', 'Синхронизируем…', 'Готово'][phase]
+      : ['Sync the lyrics', 'Syncing…', 'Done'][phase];
+    if (hintEl) hintEl.textContent = ru
+      ? ['Распознаём звук и расставляем тайминги', 'Распознаём звук и расставляем тайминги', 'Совпадение с аудио: 96%'][phase]
+      : ['Recognising the audio and placing timings', 'Recognising the audio and placing timings', 'Audio match: 96%'][phase];
+    const row = sc.querySelector('[data-ai-row]');
+    if (row) row.style.opacity = phase === 1 ? (0.72 + 0.28 * Math.abs(Math.sin(p * 20))).toFixed(2) : '1';
+    const lines = Array.from(sc.querySelectorAll('[data-line]'));
+    const synced = Math.max(0, Math.min(1, (p - 0.5) / 0.18));
+    const active = Math.min(lines.length - 1, Math.floor(Math.max(0, (p - 0.62)) / 0.11));
+    lines.forEach((el, i) => {
+      const on = synced > 0.6 && i === active;
+      el.style.filter = 'blur(' + ((1 - synced) * 1.3).toFixed(2) + 'px)';
+      el.style.color = on ? 'var(--color-text)' : 'color-mix(in srgb, var(--color-text) ' + (30 + synced * 12).toFixed(0) + '%, transparent)';
+      el.style.transform = on ? 'scale(1.05)' : 'scale(1)';
+      el.style.textShadow = on ? '0 0 26px color-mix(in srgb, var(--color-accent) 45%, transparent)' : 'none';
+      el.style.background = on ? 'color-mix(in srgb, var(--color-accent) 9%, transparent)' : 'transparent';
+      if (synced > 0.4) {
+        if (!el.dataset.stamped) { el.dataset.stamped = '1'; el.dataset.plain = el.textContent; el.textContent = el.dataset.t + '   ' + el.dataset.plain; }
+      } else if (el.dataset.stamped) { el.textContent = el.dataset.plain; delete el.dataset.stamped; }
+    });
+  }
+
+  scene3(sc, p) {
+    const wrap = sc.querySelector('[data-bars]');
+    if (!wrap) return;
+    const bars = Array.from(wrap.children).filter((c) => !c.hasAttribute('data-head'));
+    const head = wrap.querySelector('[data-head]');
+    const idx = p * bars.length;
+    bars.forEach((b, i) => { b.style.background = i < idx ? 'var(--color-accent)' : 'var(--color-neutral-800)'; b.style.opacity = i < idx ? '0.9' : '1'; });
+    if (head) head.style.left = (p * 100).toFixed(2) + '%';
+    const time = sc.querySelector('[data-time]');
+    if (time) { const s = Math.round(p * 222); time.textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+    sc.querySelectorAll('[data-peer]').forEach((el, i) => {
+      el.style.transform = 'scale(' + (1 + 0.09 * Math.sin(p * 12 + i * 2)).toFixed(3) + ')';
+    });
+  }
+
+  scene4(sc, p) {
+    sc.querySelectorAll('[data-row]').forEach((el, i) => {
+      const o = Math.max(0, Math.min(1, (p - i * 0.13) / 0.22));
+      el.style.opacity = o.toFixed(3);
+      el.style.transform = 'translateY(' + ((1 - o) * 16).toFixed(1) + 'px)';
+    });
+  }
+
+  scene5(sc, p) {
+    const seeds = sc.querySelectorAll('[data-seed]');
+    const act = p < 0.5 ? 0 : 1;
+    seeds.forEach((m, i) => {
+      const on = i === act;
+      m.style.color = on ? 'var(--color-accent-100)' : '';
+      m.style.background = on ? 'var(--color-accent-800)' : '';
+      m.style.borderColor = on ? 'var(--color-accent)' : '';
+    });
+    sc.querySelectorAll('[data-rec]').forEach((el, i) => {
+      const o = Math.max(0, Math.min(1, (p - i * 0.14) / 0.24));
+      el.style.opacity = o.toFixed(3);
+      el.style.transform = 'translateY(' + ((1 - o) * 14).toFixed(1) + 'px)';
+    });
+  }
+
+  scene6(sc, p) {
+    const frame = sc.querySelector('[data-frame]');
+    if (!frame) return;
+    const steps = ['var(--color-accent)', 'var(--color-accent-400)', 'var(--color-accent-2)', 'var(--color-accent-300)'];
+    frame.style.setProperty('--acc', steps[Math.min(steps.length - 1, Math.floor(p * steps.length))]);
+    const body = sc.querySelector('[data-frame-body]');
+    if (body) body.style.gridTemplateColumns = (p > 0.66 ? '0px' : p > 0.33 ? '56px' : '96px') + ' 1fr';
+    const panel = sc.querySelector('[data-panel]');
+    if (panel) panel.style.opacity = p > 0.66 ? '0' : '1';
+    const grid = sc.querySelector('[data-grid]');
+    if (grid) grid.style.gridTemplateColumns = 'repeat(' + (p > 0.66 ? 4 : 3) + ',1fr)';
+    sc.querySelectorAll('[data-tile]').forEach((t, i) => { t.style.borderRadius = (4 + p * 14).toFixed(1) + 'px'; t.style.opacity = (0.55 + 0.45 * Math.min(1, Math.max(0, p * 6 - i * 0.3))).toFixed(2); });
+    const seek = sc.querySelector('[data-seek]');
+    if (seek) { const w = (18 + p * 62).toFixed(0); seek.style.background = 'linear-gradient(to right, var(--acc) 0%, var(--acc) ' + w + '%, var(--color-neutral-800) ' + w + '%)'; }
+  }
+
+  scene7(sc, p) {
+    const e = Math.min(1, p / 0.7);
+    const k = 1 - Math.pow(1 - e, 3);
+    sc.querySelectorAll('[data-stat]').forEach((el) => {
+      const val = Number(el.dataset.val) * k;
+      const dec = Number(el.dataset.dec || 0);
+      const suf = this.lang === 'en' ? (el.dataset.suffixEn || '') : (el.dataset.suffix || '');
+      el.textContent = val.toFixed(dec).replace('.', ',') + suf;
+    });
+  }
 }
 
-for(let i=0;i<60;i++) pts.push(new P());
-
-(function render(){
-    ctx.clearRect(0,0,W,H);
-    for(let i=0;i<pts.length;i++){
-        pts[i].update(); pts[i].draw();
-        for(let j=i+1;j<pts.length;j++){
-            const dx=pts[i].x-pts[j].x, dy=pts[i].y-pts[j].y;
-            const d=Math.sqrt(dx*dx+dy*dy);
-            if(d<130){
-                ctx.beginPath();
-                ctx.moveTo(pts[i].x,pts[i].y);
-                ctx.lineTo(pts[j].x,pts[j].y);
-                ctx.strokeStyle=`rgba(255,255,255,${.025*(1-d/130)})`;
-                ctx.lineWidth=.5;
-                ctx.stroke();
-            }
-        }
-    }
-    requestAnimationFrame(render);
-})();
-
-/* Equalizer */
-const eqWrap = document.getElementById('eqBars');
-for(let i=0;i<12;i++){
-    const b=document.createElement('i');
-    b.style.height=(8+Math.random()*24)+'px';
-    b.style.animationDelay=(i*.08)+'s';
-    b.style.animationDuration=(.8+Math.random()*.6)+'s';
-    eqWrap.appendChild(b);
-}
-
-/* Scroll reveal */
-const obs = new IntersectionObserver(entries=>{
-    entries.forEach(e=>{ if(e.isIntersecting) e.target.classList.add('visible'); });
-},{threshold:.12, rootMargin:'0px 0px -40px 0px'});
-document.querySelectorAll('.reveal').forEach(el=>obs.observe(el));
-
-/* Nav shrink */
-addEventListener('scroll',()=>{
-    document.getElementById('nav').classList.toggle('scrolled', scrollY>60);
-});
-
-/* Hero parallax */
-addEventListener('scroll',()=>{
-    const h=document.querySelector('.hero-content');
-    if(!h) return;
-    h.style.transform=`translateY(${scrollY*.25}px)`;
-    h.style.opacity=Math.max(0,1-scrollY/700);
-});
 </script>
 </body>
 </html>
