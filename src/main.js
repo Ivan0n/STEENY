@@ -21,6 +21,7 @@ const { autoUpdater } = require('electron-updater');
 const { DiscordPresence } = require('./rpc');
 const { createUpdateManager } = require('./updater');
 const { createWindowResourceManager } = require('./window-resource-manager');
+const { createWindowShortcutHandler } = require('./window-shortcuts');
 
 // The root route renders login for a new session and redirects an authenticated
 // user to `/home`. Starting there avoids an anonymous `/home` → `/` redirect.
@@ -89,7 +90,12 @@ function loadWindowState() {
 }
 
 function saveWindowState() {
-  if (!mainWindow || mainWindow.isDestroyed() || mainWindow.isMaximized()) return;
+  if (
+    !mainWindow
+    || mainWindow.isDestroyed()
+    || mainWindow.isMaximized()
+    || mainWindow.isFullScreen()
+  ) return;
   try {
     fs.mkdirSync(app.getPath('userData'), { recursive: true });
     fs.writeFileSync(
@@ -336,11 +342,10 @@ function createWindow() {
       mainWindow.loadFile(offlinePath);
     },
   );
-  mainWindow.webContents.on('before-input-event', (event, input) => {
-    const zoomShortcut = input.control
-      && ['+', '-', '=', '0'].includes(input.key);
-    if (zoomShortcut || (!DEVTOOLS && input.key === 'F12')) event.preventDefault();
-  });
+  mainWindow.webContents.on(
+    'before-input-event',
+    createWindowShortcutHandler(mainWindow, { devtools: DEVTOOLS }),
+  );
 
   mainWindow.once('ready-to-show', () => {
     if (!SMOKE_TEST) {
