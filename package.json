@@ -1,6 +1,6 @@
 {
   "name": "steeny-client",
-  "version": "2.1.4",
+  "version": "2.1.5",
   "description": "Безопасный Electron-клиент для музыкального сервиса STEENY",
   "main": "src/main.js",
   "author": {
