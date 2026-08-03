@@ -13,18 +13,24 @@ const {
   nativeTheme,
   net,
   powerMonitor,
+  safeStorage,
   session,
   shell,
   Tray,
 } = require('electron');
 const { autoUpdater } = require('electron-updater');
+const {
+  createLinkClient,
+  createTokenStore,
+  runLinkFlow,
+} = require('./auth');
 const { DiscordPresence } = require('./rpc');
 const { createUpdateManager } = require('./updater');
 const { createWindowResourceManager } = require('./window-resource-manager');
 
 // The root route renders login for a new session and redirects an authenticated
 // user to `/home`. Starting there avoids an anonymous `/home` → `/` redirect.
-const DEFAULT_APP_URL = 'https://music.steeny.fun/';
+const DEFAULT_APP_URL = 'http://127.0.0.1:5000';
 function resolveAppUrl(rawUrl) {
   try {
     const value = new URL(String(rawUrl || DEFAULT_APP_URL).trim());
@@ -49,6 +55,8 @@ const SMOKE_TEST = process.argv.includes('--smoke-test');
 const iconPath = path.join(__dirname, '..', 'assets', 'icon.png');
 const offlinePath = path.join(__dirname, '..', 'assets', 'offline.html');
 const offlineUrl = pathToFileURL(offlinePath).href;
+const linkPath = path.join(__dirname, '..', 'assets', 'link.html');
+const linkUrl = pathToFileURL(linkPath).href;
 
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 app.commandLine.appendSwitch('disk-cache-size', String(50 * 1024 * 1024));
@@ -65,6 +73,15 @@ let tray = null;
 let quitting = false;
 let offlineLoaded = false;
 let updates = null;
+let appSession = null;
+let tokenStore = null;
+let linkClient = null;
+let authState = { status: 'idle' };
+let linkAbort = null;
+// One self-heal attempt per navigation, so a server that keeps bouncing us to
+// the login page cannot turn into a reload loop.
+let recovering = false;
+let lastRecoveryAt = 0;
 const rpc = new DiscordPresence();
 const resources = createWindowResourceManager();
 
@@ -111,7 +128,7 @@ function isAllowedMainFrame(rawUrl) {
   try {
     const value = new URL(rawUrl);
     if (value.origin === APP_ORIGIN) return true;
-    return value.href === offlineUrl;
+    return value.href === offlineUrl || value.href === linkUrl;
   } catch {
     return false;
   }
@@ -167,6 +184,149 @@ async function loadApp() {
   return false;
 }
 
+// ── Sign-in state ───────────────────────────────────────────────────────────
+
+function setAuthState(state) {
+  authState = { ...state };
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('auth:state', authState);
+  }
+}
+
+async function showLinkScreen() {
+  if (!mainWindow || mainWindow.isDestroyed()) return false;
+  offlineLoaded = false;
+  await mainWindow.loadFile(linkPath);
+  return false;
+}
+
+async function showOffline() {
+  if (!mainWindow || mainWindow.isDestroyed()) return false;
+  offlineLoaded = true;
+  await mainWindow.loadFile(offlinePath);
+  return false;
+}
+
+/**
+ * Decide what the window should show: the app, the sign-in screen, or the
+ * offline notice. A stored token is thrown away only when the server actually
+ * rejects it -- a dead network must never cost the user their session.
+ */
+async function enterApp() {
+  if (!mainWindow || mainWindow.isDestroyed()) return false;
+  const token = tokenStore?.read();
+  if (!token) {
+    setAuthState({ status: 'idle' });
+    return showLinkScreen();
+  }
+  let handoff;
+  try {
+    handoff = await linkClient.establishSession(token);
+  } catch {
+    return showOffline();
+  }
+  if (handoff.ok) return loadApp();
+  if (handoff.unauthorized) {
+    tokenStore.clear();
+    setAuthState({ status: 'idle' });
+    return showLinkScreen();
+  }
+  return showOffline();
+}
+
+async function beginLink() {
+  if (linkAbort) return authState;
+  linkAbort = new AbortController();
+  try {
+    const result = await runLinkFlow({
+      client: linkClient,
+      openBrowser: openExternal,
+      onState: setAuthState,
+      signal: linkAbort.signal,
+    });
+    if (result.status === 'authorized') {
+      tokenStore.write(result.token);
+      linkAbort = null;
+      await enterApp();
+      return authState;
+    }
+    if (result.status === 'cancelled') setAuthState({ status: 'idle' });
+    else setAuthState({ status: 'error', reason: result.status });
+  } catch (error) {
+    setAuthState({
+      status: 'error',
+      reason: error?.offline ? 'offline' : 'failed',
+      message: error?.message,
+    });
+  } finally {
+    linkAbort = null;
+  }
+  return authState;
+}
+
+async function signOut() {
+  linkAbort?.abort();
+  linkAbort = null;
+  tokenStore?.clear();
+  try {
+    // Drop the cookie too, otherwise the next launch would silently walk back
+    // into the account the user just left.
+    await appSession?.clearStorageData({ storages: ['cookies'] });
+  } catch {
+    // A locked profile still signs out: the token file is already gone.
+  }
+  setAuthState({ status: 'idle' });
+  return showLinkScreen();
+}
+
+/**
+ * The web app renders its login form only at the root path, so landing there
+ * means the cookie session is gone -- either the user logged out or the token
+ * was revoked from another device. Re-establish it when the token is still
+ * good, and fall back to the sign-in screen when it is not.
+ */
+async function handlePossibleSignOut(rawUrl) {
+  if (recovering || !tokenStore) return;
+  let parsed;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    return;
+  }
+  if (parsed.origin !== APP_ORIGIN || parsed.pathname !== '/') return;
+  const token = tokenStore.read();
+  if (!token) {
+    await showLinkScreen();
+    return;
+  }
+  if (Date.now() - lastRecoveryAt < 15000) {
+    // We just handed the cookie over and still ended up here. Stop bouncing.
+    tokenStore.clear();
+    setAuthState({ status: 'idle' });
+    await showLinkScreen();
+    return;
+  }
+  recovering = true;
+  lastRecoveryAt = Date.now();
+  try {
+    const check = await linkClient.checkToken(token);
+    if (check.valid) {
+      const handoff = await linkClient.establishSession(token);
+      if (handoff.ok) {
+        await loadApp();
+        return;
+      }
+    }
+    tokenStore.clear();
+    setAuthState({ status: 'idle' });
+    await showLinkScreen();
+  } catch {
+    // Offline: the page on screen is as good an answer as we have.
+  } finally {
+    recovering = false;
+  }
+}
+
 function showWindow() {
   if (!mainWindow || mainWindow.isDestroyed()) return;
   if (mainWindow.isMinimized()) mainWindow.restore();
@@ -215,6 +375,16 @@ function setupTray() {
 
 function configureSession() {
   const appSession = session.fromPartition('persist:steeny');
+  // Logging out inside the web app has to drop the desktop token as well,
+  // otherwise the next launch would sign straight back in and "выйти" would
+  // look broken.
+  appSession.webRequest.onCompleted(
+    { urls: [`${APP_ORIGIN}/logout`, `${APP_ORIGIN}/logout?*`] },
+    details => {
+      if (details.method !== 'POST') return;
+      signOut().catch(() => undefined);
+    },
+  );
   appSession.setPermissionCheckHandler(
     (_webContents, permission, requestingOrigin, details) => {
       const mediaType = details?.mediaType;
@@ -249,7 +419,6 @@ function sendPowerState() {
 
 function createWindow() {
   const bounds = loadWindowState();
-  const appSession = configureSession();
   mainWindow = new BrowserWindow({
     width: bounds?.width || 1354,
     height: bounds?.height || 868,
@@ -277,6 +446,10 @@ function createWindow() {
     },
   });
 
+  // Keep Electron's own UA tokens intact. Cloudflare Turnstile cross-checks the
+  // UA string against `navigator.userAgentData`, which always reports Chromium
+  // here; hiding the `Electron/<version>` token makes the two disagree and the
+  // widget hard-fails with "Сбой проверки" instead of showing its checkbox.
   const defaultUa = mainWindow.webContents.getUserAgent();
   mainWindow.webContents.setUserAgent(
     `${defaultUa} SteenyClient/${app.getVersion()}`,
@@ -296,6 +469,9 @@ function createWindow() {
   };
   mainWindow.webContents.on('will-navigate', guardNavigation);
   mainWindow.webContents.on('will-redirect', guardNavigation);
+  mainWindow.webContents.on('did-navigate', (_event, url) => {
+    handlePossibleSignOut(url).catch(() => undefined);
+  });
   mainWindow.webContents.on('will-attach-webview', event => event.preventDefault());
   mainWindow.webContents.on('did-finish-load', async () => {
     sendPowerState();
@@ -366,7 +542,7 @@ function createWindow() {
     mainWindow = null;
   });
 
-  loadApp();
+  enterApp();
 }
 
 function installIpcHandlers() {
@@ -416,7 +592,29 @@ function installIpcHandlers() {
   });
   ipcMain.handle('backend:retry', event => {
     if (!fromMainWindow(event)) return false;
-    return loadApp();
+    return enterApp();
+  });
+  ipcMain.handle('auth:get-state', event => {
+    if (!fromMainWindow(event)) return null;
+    return authState;
+  });
+  ipcMain.handle('auth:begin', event => {
+    if (!fromMainWindow(event)) return null;
+    return beginLink();
+  });
+  ipcMain.on('auth:cancel', event => {
+    if (!fromMainWindow(event)) return;
+    linkAbort?.abort();
+  });
+  ipcMain.on('auth:open-link', event => {
+    if (!fromMainWindow(event)) return;
+    if (authState.status === 'waiting' && authState.verificationUrl) {
+      openExternal(authState.verificationUrl);
+    }
+  });
+  ipcMain.handle('auth:sign-out', event => {
+    if (!fromMainWindow(event)) return false;
+    return signOut().then(() => true);
   });
   ipcMain.handle('update:get-state', event => {
     if (!fromMainWindow(event)) return null;
@@ -445,6 +643,19 @@ if (!app.requestSingleInstanceLock()) {
     if (process.platform === 'win32') {
       app.setAppUserModelId('fun.steeny.desktop');
     }
+    appSession = configureSession();
+    tokenStore = createTokenStore({ app, safeStorage });
+    linkClient = createLinkClient({
+      origin: APP_ORIGIN,
+      // The session's own fetch keeps the handoff cookie in the same partition
+      // the window uses; net.fetch would drop it into the default session.
+      fetchImpl: (input, init) => appSession.fetch(input, init),
+      clientInfo: {
+        name: 'STEENY',
+        version: app.getVersion(),
+        platform: process.platform,
+      },
+    });
     updates = createUpdateManager({
       app,
       autoUpdater,

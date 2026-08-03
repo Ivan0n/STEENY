@@ -148,6 +148,17 @@ const bridge = Object.freeze({
   check_for_updates: () => ipcRenderer.invoke('update:check'),
   install_update: () => ipcRenderer.send('update:install'),
   open_update_page: () => ipcRenderer.send('update:open-releases'),
+  // Browser-based sign-in. Only the local link screen calls these; the web app
+  // never sees a token, it keeps using the cookie session as before.
+  auth_get_state: () => ipcRenderer.invoke('auth:get-state'),
+  auth_begin: () => ipcRenderer.invoke('auth:begin'),
+  auth_cancel: () => ipcRenderer.send('auth:cancel'),
+  auth_open_link: () => ipcRenderer.send('auth:open-link'),
+  auth_sign_out: () => ipcRenderer.invoke('auth:sign-out'),
+  on_auth_state: callback => {
+    if (typeof callback !== 'function') return;
+    ipcRenderer.on('auth:state', (_event, state) => callback(state));
+  },
   is_low_memory_mode: () => lowMemoryMode,
   on_resource_mode: callback => {
     if (typeof callback !== 'function') return;

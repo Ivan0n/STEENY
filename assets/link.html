@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>STEENY — вход</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      display: grid; place-items: center; overflow: hidden;
+      color: #f3ede4; background:
+        radial-gradient(circle at 15% 90%, rgba(193,101,45,.3), transparent 38rem),
+        radial-gradient(circle at 85% 10%, rgba(139,110,224,.27), transparent 34rem),
+        #0b0908;
+      font-family: Inter, "Segoe UI", sans-serif;
+    }
+    .drag { position: fixed; inset: 0 0 auto; height: 58px; -webkit-app-region: drag; }
+    .window-controls {
+      position: fixed; top: 10px; right: 10px; z-index: 2;
+      display: flex; gap: 4px; -webkit-app-region: no-drag;
+    }
+    .window-controls button {
+      width: 42px; height: 38px; border: 0; border-radius: 10px;
+      color: #c9bfb5; background: transparent; cursor: pointer; font-size: 18px;
+    }
+    .window-controls button:hover { background: rgba(255,255,255,.08); }
+    .window-controls .close:hover { background: rgba(226,90,90,.28); }
+
+    .card {
+      width: min(440px, calc(100vw - 40px)); padding: 38px;
+      text-align: center; border: 1px solid rgba(255,255,255,.08);
+      border-radius: 26px; background: rgba(27,21,17,.9);
+      box-shadow: 0 28px 90px rgba(0,0,0,.5); backdrop-filter: blur(22px);
+    }
+    .brand { font-size: 27px; font-weight: 800; letter-spacing: -.5px; margin-bottom: 6px; }
+    .icon {
+      width: 84px; height: 84px; display: grid; place-items: center;
+      margin: 0 auto 22px; border-radius: 24px;
+      color: #c8b6ff; background: rgba(167,139,250,.12);
+    }
+    h1 { margin: 0; font-size: 23px; }
+    p { margin: 11px 0 24px; color: #9d9185; font-size: 14px; line-height: 1.55; }
+
+    .primary {
+      width: 100%; min-height: 48px; border: 0; border-radius: 999px;
+      color: #160f28; background: #a78bfa; cursor: pointer;
+      font-weight: 800; font-size: 14.5px; transition: filter .15s;
+    }
+    .primary:hover:not(:disabled) { filter: brightness(1.07); }
+    .primary:disabled { opacity: .6; cursor: wait; }
+    .ghost {
+      width: 100%; min-height: 42px; margin-top: 10px; border: 0;
+      border-radius: 999px; background: transparent; color: #9d9185;
+      cursor: pointer; font-size: 13px; font-weight: 600;
+    }
+    .ghost:hover { color: #d4c9bd; background: rgba(255,255,255,.05); }
+
+    .code {
+      margin: 4px 0 18px; font-size: 30px; font-weight: 800;
+      letter-spacing: 6px; color: #f3ede4; font-variant-numeric: tabular-nums;
+    }
+    .code-hint { margin: 0 0 20px; font-size: 12.5px; color: #817569; line-height: 1.5; }
+
+    .spinner {
+      width: 22px; height: 22px; margin: 0 auto 16px; border-radius: 50%;
+      border: 2.5px solid rgba(167,139,250,.25); border-top-color: #a78bfa;
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .status { min-height: 18px; margin-top: 14px; color: #817569; font-size: 12.5px; line-height: 1.5; }
+    .status.error { color: #e2a05a; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="drag"></div>
+  <div class="window-controls">
+    <button id="minimize" aria-label="Свернуть">—</button>
+    <button class="close" id="close" aria-label="Закрыть">×</button>
+  </div>
+
+  <main class="card">
+    <div class="brand">STEENY</div>
+
+    <div id="viewIdle">
+      <div class="icon">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="4" width="20" height="13" rx="2"></rect>
+          <path d="M8 21h8M12 17v4"></path>
+        </svg>
+      </div>
+      <h1>Войдите в аккаунт</h1>
+      <p>Вход происходит в вашем браузере — там, где уже сохранён пароль. Приложение получит доступ только после вашего подтверждения.</p>
+      <button class="primary" id="begin">Войти через браузер</button>
+    </div>
+
+    <div id="viewWaiting" class="hidden">
+      <div class="spinner"></div>
+      <h1>Подтвердите вход в браузере</h1>
+      <p>Мы открыли страницу подтверждения. Проверьте, что код на ней совпадает с этим:</p>
+      <div class="code" id="userCode">—</div>
+      <p class="code-hint">Страница не открылась? Откройте ссылку вручную.</p>
+      <button class="primary" id="reopen">Открыть страницу ещё раз</button>
+      <button class="ghost" id="copyLink">Скопировать ссылку</button>
+      <button class="ghost" id="cancel">Отменить</button>
+    </div>
+
+    <div id="viewFinishing" class="hidden">
+      <div class="spinner"></div>
+      <h1>Входим в аккаунт…</h1>
+      <p>Ещё пара секунд.</p>
+    </div>
+
+    <div id="viewError" class="hidden">
+      <div class="icon">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+          <circle cx="12" cy="12" r="9"></circle>
+          <path d="M12 7v6"></path>
+          <circle cx="12" cy="16.5" r="1" fill="currentColor"></circle>
+        </svg>
+      </div>
+      <h1 id="errorTitle">Не удалось войти</h1>
+      <p id="errorText">Попробуйте ещё раз.</p>
+      <button class="primary" id="retry">Попробовать снова</button>
+    </div>
+
+    <div class="status" id="status"></div>
+  </main>
+
+  <script>
+    const bridge = window.steenyElectron;
+    const views = {
+      idle: document.getElementById('viewIdle'),
+      waiting: document.getElementById('viewWaiting'),
+      finishing: document.getElementById('viewFinishing'),
+      error: document.getElementById('viewError'),
+    };
+    const statusEl = document.getElementById('status');
+    let verificationUrl = '';
+
+    const MESSAGES = {
+      denied: ['Вход отклонён', 'В браузере нажали «Это не я». Если это были вы — попробуйте снова.'],
+      expired: ['Время истекло', 'Запрос действует несколько минут. Начните вход заново.'],
+      invalid: ['Запрос недействителен', 'Начните вход заново.'],
+      offline: ['Сервер недоступен', 'Проверьте подключение к интернету и попробуйте снова.'],
+    };
+
+    function show(view) {
+      for (const [name, node] of Object.entries(views)) {
+        node.classList.toggle('hidden', name !== view);
+      }
+    }
+
+    function setStatus(text, isError) {
+      statusEl.textContent = text || '';
+      statusEl.classList.toggle('error', Boolean(isError));
+    }
+
+    function render(state) {
+      const status = state?.status || 'idle';
+      if (status === 'opening') {
+        show('idle');
+        document.getElementById('begin').disabled = true;
+        setStatus('Открываем браузер…');
+        return;
+      }
+      if (status === 'waiting') {
+        verificationUrl = state.verificationUrl || verificationUrl;
+        document.getElementById('userCode').textContent = state.userCode || '—';
+        show('waiting');
+        setStatus(state.flaky ? 'Сервер не отвечает, продолжаем попытки…' : 'Ждём подтверждения…');
+        return;
+      }
+      if (status === 'finishing') {
+        show('finishing');
+        setStatus('');
+        return;
+      }
+      if (status === 'error') {
+        const [title, text] = MESSAGES[state.reason] || ['Не удалось войти', state.message || 'Попробуйте ещё раз.'];
+        document.getElementById('errorTitle').textContent = title;
+        document.getElementById('errorText').textContent = text;
+        show('error');
+        setStatus('');
+        return;
+      }
+      show('idle');
+      document.getElementById('begin').disabled = false;
+      setStatus('');
+    }
+
+    document.getElementById('minimize').onclick = () => bridge?.minimize_app();
+    document.getElementById('close').onclick = () => bridge?.close_app();
+    document.getElementById('begin').onclick = () => bridge?.auth_begin();
+    document.getElementById('retry').onclick = () => bridge?.auth_begin();
+    document.getElementById('cancel').onclick = () => bridge?.auth_cancel();
+    document.getElementById('reopen').onclick = () => bridge?.auth_open_link();
+    document.getElementById('copyLink').onclick = async () => {
+      if (!verificationUrl) return;
+      try {
+        await navigator.clipboard.writeText(verificationUrl);
+        setStatus('Ссылка скопирована');
+      } catch {
+        setStatus(verificationUrl);
+      }
+    };
+
+    bridge?.on_auth_state?.(render);
+    bridge?.auth_get_state?.().then(render).catch(() => render({ status: 'idle' }));
+  </script>
+</body>
+</html>
