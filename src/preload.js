@@ -11,6 +11,10 @@ let degraded = false;
 let domReady = false;
 const suspendedVideos = new Map();
 const RESOURCE_STYLE_ID = 'steeny-electron-resource-style';
+// The main process watches for these. Their whole value is that they stop
+// arriving the instant the renderer stops running script, which is precisely
+// the state Chromium's own 'unresponsive' event reports late or not at all.
+const HEARTBEAT_MS = 5000;
 
 function installResourceStyle() {
   if (!document.head || document.getElementById(RESOURCE_STYLE_ID)) return;
@@ -216,10 +220,22 @@ ipcRenderer.on('resource-mode', (_event, state) => {
 // the degradation instead of leaving the window frozen-looking for good.
 document.addEventListener('visibilitychange', () => applyResourceMode());
 
+function beat() {
+  try {
+    ipcRenderer.send('ui:heartbeat');
+  } catch {
+    // The renderer is being torn down; there is nothing left to report to.
+  }
+}
+
 window.addEventListener('DOMContentLoaded', () => {
   domReady = true;
   document.documentElement.classList.add('desktop-client', 'electron-client');
   makeTitlebarControlsInteractive();
   if (lastChargingState !== null) deliverPowerState(lastChargingState);
   applyResourceMode();
+  // Report immediately so the watchdog starts from a fresh page rather than
+  // counting the load itself against the timeout.
+  beat();
+  setInterval(beat, HEARTBEAT_MS);
 });

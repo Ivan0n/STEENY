@@ -28,6 +28,7 @@ const { DiscordPresence, applyStatusTemplate } = require('./rpc');
 const { setStatus, checkToken } = require('./cli');
 const { createUpdateManager } = require('./updater');
 const { createWindowResourceManager } = require('./window-resource-manager');
+const { createRendererRecovery } = require('./renderer-recovery');
 
 // The root route renders login for a new session and redirects an authenticated
 // user to `/home`. Starting there avoids an anonymous `/home` → `/` redirect.
@@ -100,9 +101,35 @@ let linkAbort = null;
 // the login page cannot turn into a reload loop.
 let recovering = false;
 let lastRecoveryAt = 0;
+// Checked far more often than the timeout it enforces, so a hang is caught
+// within a few seconds of crossing the line rather than a full period later.
+const HEARTBEAT_CHECK_MS = 5000;
+let heartbeatWatchdog = null;
 const rpc = new DiscordPresence({ onLatency: sendRpcLatency });
 const resources = createWindowResourceManager({
   getMetrics: () => app.getAppMetrics(),
+});
+// Brings the interface back when the renderer dies or wedges. Reloading the
+// current URL keeps the user where they were; the offline notice is the last
+// resort once repeated crashes prove the page itself cannot load.
+const recovery = createRendererRecovery({
+  reload: () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    // A crashed renderer has no page left to reload, and reload() on the
+    // offline file would just re-show the notice instead of retrying the app.
+    if (offlineLoaded) loadApp().catch(() => undefined);
+    else mainWindow.webContents.reload();
+  },
+  forceCrash: () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    mainWindow.webContents.forcefullyCrashRenderer();
+  },
+  showFallback: () => {
+    showOffline().catch(() => undefined);
+  },
+  onEvent: ({ cause, action }) => {
+    console.warn(`STEENY renderer ${cause} -> ${action}`);
+  },
 });
 
 // How long the last status/presence update took to reach Discord. The web
@@ -673,6 +700,31 @@ function createWindow() {
       mainWindow.loadFile(offlinePath);
     },
   );
+  // Without these the window survives its own renderer: it stays on screen,
+  // painted in backgroundColor, with no page inside it and no way back.
+  mainWindow.webContents.on('render-process-gone', (_event, details) => {
+    if (SMOKE_TEST) {
+      console.error(`STEENY_SMOKE_FAILED renderer gone: ${details?.reason}`);
+      app.exit(1);
+      return;
+    }
+    recovery.rendererGone(details);
+  });
+  mainWindow.on('unresponsive', () => recovery.unresponsive());
+  mainWindow.on('responsive', () => recovery.responsive());
+  // A throttled window legitimately stops beating, so the watchdog only judges
+  // a window the user can actually see.
+  heartbeatWatchdog = setInterval(() => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    const visible = mainWindow.isVisible() && !mainWindow.isMinimized();
+    // A page still loading has not reached DOMContentLoaded, so it has not
+    // started beating yet. On a slow connection that is ordinary, not a hang --
+    // judging it would kill the very load it is waiting on, and the reload
+    // would walk straight into the same timeout.
+    const settled = !mainWindow.webContents.isLoading();
+    recovery.checkHeartbeat(visible && settled);
+  }, HEARTBEAT_CHECK_MS);
+  heartbeatWatchdog.unref?.();
   mainWindow.webContents.on('before-input-event', (event, input) => {
     const zoomShortcut = input.control
       && ['+', '-', '=', '0'].includes(input.key);
@@ -705,6 +757,9 @@ function createWindow() {
   mainWindow.on('resized', saveWindowState);
   mainWindow.on('closed', () => {
     resources.unbind();
+    recovery.dispose();
+    if (heartbeatWatchdog) clearInterval(heartbeatWatchdog);
+    heartbeatWatchdog = null;
     mainWindow = null;
   });
 
@@ -717,6 +772,9 @@ function installIpcHandlers() {
     && !mainWindow.isDestroyed()
     && event.sender === mainWindow.webContents
   );
+  ipcMain.on('ui:heartbeat', event => {
+    if (fromMainWindow(event)) recovery.heartbeat();
+  });
   ipcMain.on('window:close', event => {
     if (!fromMainWindow(event)) return;
     mainWindow.close();
@@ -848,6 +906,17 @@ if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   app.on('second-instance', showWindow);
+  // Chromium restarts a dead GPU process by itself, falling back to software
+  // rendering when it has to, so this only records what happened. A run of
+  // these lines next to a user's "the window went blank" is the difference
+  // between guessing and knowing.
+  app.on('child-process-gone', (_event, details) => {
+    if (details?.type === 'Utility' && details?.reason === 'clean-exit') return;
+    console.warn(
+      `STEENY child process gone: type=${details?.type}`
+      + ` reason=${details?.reason} exit=${details?.exitCode}`,
+    );
+  });
   app.whenReady().then(() => {
     nativeTheme.themeSource = 'dark';
     app.setName('STEENY');
