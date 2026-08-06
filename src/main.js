@@ -31,7 +31,7 @@ const { createWindowResourceManager } = require('./window-resource-manager');
 
 // The root route renders login for a new session and redirects an authenticated
 // user to `/home`. Starting there avoids an anonymous `/home` → `/` redirect.
-const DEFAULT_APP_URL = 'https://music.steeny.fun';
+const DEFAULT_APP_URL = 'https://music.steeny.fun/';
 function resolveAppUrl(rawUrl) {
   try {
     const value = new URL(String(rawUrl || DEFAULT_APP_URL).trim());
