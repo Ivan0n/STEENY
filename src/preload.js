@@ -3,7 +3,11 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 let lastChargingState = null;
+// What the main process last asked for, and what is actually in effect. They
+// differ whenever the main process says "hidden" about a page Chromium still
+// reports as visible.
 let lowMemoryMode = false;
+let degraded = false;
 let domReady = false;
 const suspendedVideos = new Map();
 const RESOURCE_STYLE_ID = 'steeny-electron-resource-style';
@@ -93,22 +97,31 @@ function restoreHeavyVideos() {
 function dispatchResourceMode() {
   try {
     window.dispatchEvent(new CustomEvent('steeny-resource-mode', {
-      detail: { lowMemory: lowMemoryMode },
+      detail: { lowMemory: degraded },
     }));
   } catch {
     // The remote page does not need this event for the built-in cleanup.
   }
 }
 
+// document.visibilityState is Chromium's own answer, and it cannot disagree
+// with what the user is actually looking at. The main process only infers
+// visibility from window state, which a compositor can report late or wrongly
+// -- and a single wrong "hidden" there used to strip animations and video
+// sources from a window sitting in plain sight, with no event left to undo it.
+// Degrading is therefore gated on both signals agreeing; restoring needs only
+// one, because being wrong in that direction merely costs a little memory.
+function pageHidden() {
+  return document.visibilityState === 'hidden';
+}
+
 function applyResourceMode(payload) {
-  lowMemoryMode = Boolean(payload?.lowMemory);
+  if (payload && 'lowMemory' in payload) lowMemoryMode = Boolean(payload.lowMemory);
   if (!domReady || !document.documentElement) return;
+  degraded = lowMemoryMode && pageHidden();
   installResourceStyle();
-  document.documentElement.classList.toggle(
-    'steeny-low-memory-mode',
-    lowMemoryMode,
-  );
-  if (lowMemoryMode) suspendHeavyVideos();
+  document.documentElement.classList.toggle('steeny-low-memory-mode', degraded);
+  if (degraded) suspendHeavyVideos();
   else restoreHeavyVideos();
   dispatchResourceMode();
 }
@@ -129,6 +142,22 @@ function makeTitlebarControlsInteractive() {
     ?.style.setProperty('-webkit-app-region', 'no-drag', 'important');
 }
 
+// Each of these channels has exactly one consumer, but the web app is free to
+// re-register on re-init or a route change. Plain ipcRenderer.on would stack a
+// new listener every time and never drop the old one -- the callbacks and
+// everything they close over would be retained for the life of the page, and
+// each event would run the same handler N times over. Swapping the previous
+// listener keeps re-registration idempotent.
+const channelListeners = new Map();
+function subscribe(channel, callback, transform = value => value) {
+  if (typeof callback !== 'function') return;
+  const previous = channelListeners.get(channel);
+  if (previous) ipcRenderer.removeListener(channel, previous);
+  const listener = (_event, payload) => callback(transform(payload));
+  channelListeners.set(channel, listener);
+  ipcRenderer.on(channel, listener);
+}
+
 const bridge = Object.freeze({
   close_app: () => ipcRenderer.send('window:close'),
   minimize_app: () => ipcRenderer.send('window:minimize'),
@@ -141,8 +170,13 @@ const bridge = Object.freeze({
   },
   set_zoom_factor: factor => ipcRenderer.send('window:set-zoom', factor),
   open_external_url: url => ipcRenderer.send('external:open', url),
-  update_rpc: dataJson => ipcRenderer.send('rpc:update', dataJson),
-  clear_rpc: () => ipcRenderer.send('rpc:clear'),
+  update_rpc: dataJson => ipcRenderer.invoke('rpc:update', dataJson),
+  clear_rpc: () => ipcRenderer.invoke('rpc:clear'),
+  save_discord_token: value => ipcRenderer.invoke('discord-token:save', value),
+  has_discord_token: () => ipcRenderer.invoke('discord-token:has'),
+  on_rpc_latency: callback => subscribe(
+    'rpc:latency', callback, ms => Number(ms) || 0,
+  ),
   retry_backend: () => ipcRenderer.invoke('backend:retry'),
   get_update_state: () => ipcRenderer.invoke('update:get-state'),
   check_for_updates: () => ipcRenderer.invoke('update:check'),
@@ -155,19 +189,14 @@ const bridge = Object.freeze({
   auth_cancel: () => ipcRenderer.send('auth:cancel'),
   auth_open_link: () => ipcRenderer.send('auth:open-link'),
   auth_sign_out: () => ipcRenderer.invoke('auth:sign-out'),
-  on_auth_state: callback => {
-    if (typeof callback !== 'function') return;
-    ipcRenderer.on('auth:state', (_event, state) => callback(state));
-  },
-  is_low_memory_mode: () => lowMemoryMode,
-  on_resource_mode: callback => {
-    if (typeof callback !== 'function') return;
-    ipcRenderer.on('resource-mode', (_event, state) => callback({ ...state }));
-  },
-  on_update_state: callback => {
-    if (typeof callback !== 'function') return;
-    ipcRenderer.on('update:state', (_event, state) => callback(state));
-  },
+  on_auth_state: callback => subscribe('auth:state', callback),
+  // The effective mode, not what the main process asked for -- the page must
+  // see what is actually applied to it.
+  is_low_memory_mode: () => degraded,
+  on_resource_mode: callback => subscribe(
+    'resource-mode', callback, state => ({ ...state, lowMemory: degraded }),
+  ),
+  on_update_state: callback => subscribe('update:state', callback),
   is_electron: true,
 });
 
@@ -181,10 +210,16 @@ ipcRenderer.on('resource-mode', (_event, state) => {
   applyResourceMode(state);
 });
 
+// Chromium flips this itself when the window is minimized, hidden or occluded,
+// so it also serves as the recovery path: should the main process ever leave a
+// stale "hidden" behind, the first moment the page is genuinely visible undoes
+// the degradation instead of leaving the window frozen-looking for good.
+document.addEventListener('visibilitychange', () => applyResourceMode());
+
 window.addEventListener('DOMContentLoaded', () => {
   domReady = true;
   document.documentElement.classList.add('desktop-client', 'electron-client');
   makeTitlebarControlsInteractive();
   if (lastChargingState !== null) deliverPowerState(lastChargingState);
-  applyResourceMode({ lowMemory: lowMemoryMode });
+  applyResourceMode();
 });

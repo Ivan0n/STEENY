@@ -8,6 +8,8 @@ const test = require('node:test');
 const {
   collectRendererGarbage,
   createWindowResourceManager,
+  rendererWorkingSetKb,
+  totalWorkingSetKb,
 } = require('../src/window-resource-manager');
 
 test('client enables Chromium throttling and renderer media cleanup', () => {
@@ -22,11 +24,27 @@ test('client enables Chromium throttling and renderer media cleanup', () => {
   assert.match(mainSource, /backgroundThrottling:\s*true/);
   assert.doesNotMatch(mainSource, /backgroundThrottling:\s*false/);
   assert.match(mainSource, /renderer-process-limit/);
+  assert.match(mainSource, /process-per-site/);
+  assert.match(mainSource, /max-old-space-size/);
+  assert.match(mainSource, /getAppMetrics/);
   assert.match(mainSource, /resources\.sync\(\)/);
+  // Graphics must never be downgraded to save memory.
+  assert.doesNotMatch(mainSource, /enable-low-end-device-mode/);
+  assert.doesNotMatch(mainSource, /disable-gpu/);
   assert.match(preloadSource, /appearanceWallpaperVideo/);
   assert.match(preloadSource, /fpVideo/);
   assert.match(preloadSource, /steeny-low-memory-mode/);
   assert.match(preloadSource, /removeAttribute\('src'\)/);
+  // A visible page must never be degraded on the main process's word alone,
+  // and visibilitychange has to be able to undo a stale signal.
+  assert.match(preloadSource, /document\.visibilityState === 'hidden'/);
+  assert.match(preloadSource, /visibilitychange/);
+  // resources.bind() has to precede show(), or the 'show' event is missed and
+  // low-memory mode can latch on for good.
+  assert.match(
+    mainSource,
+    /resources\.bind\(mainWindow\);\s*\n\s*mainWindow\.show\(\);/,
+  );
 });
 
 class FakeWindow extends EventEmitter {
@@ -96,6 +114,34 @@ test('enters low-memory mode while minimized and restores on show', async () => 
   assert.equal(window.listenerCount('hide'), 0);
 });
 
+test('a scheduled purge is re-checked when it fires, not when it was queued', async () => {
+  const window = new FakeWindow();
+  const collected = [];
+  const scheduled = [];
+  const manager = createWindowResourceManager({
+    setTimer: callback => {
+      scheduled.push(callback);
+      return { unref() {} };
+    },
+    clearTimer: () => undefined,
+    collectGarbage: async webContents => collected.push(webContents),
+  });
+
+  manager.bind(window);
+  window.visible = false;
+  window.emit('hide');
+  assert.equal(scheduled.length, 1);
+
+  // The user brings the window back before the delayed purge fires. Forcing a
+  // full GC on it now would stall the renderer in plain sight.
+  window.visible = true;
+  window.emit('show');
+  await scheduled.at(-1)();
+  assert.deepEqual(collected, []);
+
+  manager.unbind();
+});
+
 test('renderer garbage collection attaches and detaches a private debugger', async () => {
   const commands = [];
   const debuggerClient = {
@@ -121,6 +167,120 @@ test('renderer garbage collection attaches and detaches a private debugger', asy
   assert.equal(collected, true);
   assert.deepEqual(commands, ['HeapProfiler.collectGarbage']);
   assert.equal(debuggerClient.attached, false);
+});
+
+test('never sends the purge command that wedges the renderer', () => {
+  const source = fs.readFileSync(
+    path.join(__dirname, '..', 'src', 'window-resource-manager.js'),
+    'utf8',
+  );
+
+  // Measured: this command reports success and detaches cleanly, but the
+  // renderer never runs script again -- the window returns from the tray
+  // frozen. Keep it out of the purge list.
+  assert.doesNotMatch(
+    source,
+    /^\s*(?!\/\/).*'Memory\.forciblyPurgeJavaScriptMemory'/m,
+  );
+});
+
+test('a failing purge command still detaches the debugger', async () => {
+  const debuggerClient = {
+    attached: false,
+    isAttached() { return this.attached; },
+    attach() { this.attached = true; },
+    detach() { this.attached = false; },
+    async sendCommand() { throw new Error('unknown command'); },
+  };
+
+  const collected = await collectRendererGarbage({
+    isDestroyed: () => false,
+    debugger: debuggerClient,
+  });
+
+  assert.equal(collected, true);
+  assert.equal(debuggerClient.attached, false);
+});
+
+test('memory accounting separates the renderer from the fixed helper cost', () => {
+  const metrics = [
+    { type: 'Browser', memory: { workingSetSize: 90_000 } },
+    { type: 'GPU', memory: { workingSetSize: 70_000 } },
+    { type: 'Tab', memory: { workingSetSize: 120_000 } },
+    { type: 'Tab', memory: {} },
+    { type: 'Utility' },
+  ];
+
+  // Only the renderer can be reclaimed by a JS purge, so only it is budgeted.
+  assert.equal(rendererWorkingSetKb(metrics), 120_000);
+  assert.equal(totalWorkingSetKb(metrics), 280_000);
+  assert.equal(rendererWorkingSetKb(null), 0);
+  assert.equal(totalWorkingSetKb(null), 0);
+});
+
+test('the watchdog reclaims only when over budget, and respects the cooldown', async () => {
+  const window = new FakeWindow();
+  const collected = [];
+  let usageKb = 150 * 1024;
+  let clock = 0;
+  let poll = null;
+  const manager = createWindowResourceManager({
+    memoryBudgetKb: 200 * 1024,
+    purgeCooldownMs: 60000,
+    getMetrics: () => [
+      // A large fixed helper cost must never on its own trigger a purge --
+      // only the renderer's own growth counts against the budget.
+      { type: 'Browser', memory: { workingSetSize: 120 * 1024 } },
+      { type: 'GPU', memory: { workingSetSize: 90 * 1024 } },
+      { type: 'Tab', memory: { workingSetSize: usageKb } },
+    ],
+    setTimer: () => ({ unref() {} }),
+    clearTimer: () => undefined,
+    setPoll: callback => {
+      poll = callback;
+      return { unref() {} };
+    },
+    clearPoll: () => undefined,
+    now: () => clock,
+    collectGarbage: async webContents => collected.push(webContents),
+  });
+
+  manager.bind(window);
+  assert.equal(typeof poll, 'function');
+
+  // Comfortably inside the budget: nothing to reclaim.
+  poll();
+  assert.equal(collected.length, 0);
+
+  // Over budget, but the window is on screen. A purge stalls the renderer, so
+  // a visible window is never touched no matter how far over budget it is.
+  usageKb = 260 * 1024;
+  poll();
+  assert.equal(collected.length, 0);
+
+  // Hidden and over budget: now it is safe to reclaim.
+  window.visible = false;
+  window.emit('hide');
+  poll();
+  assert.equal(collected.length, 1);
+
+  // Still over budget, but the cooldown has not elapsed.
+  clock += 10000;
+  poll();
+  assert.equal(collected.length, 1);
+
+  clock += 60000;
+  poll();
+  assert.equal(collected.length, 2);
+
+  // Back on screen: reclaiming stops again, cooldown or not.
+  clock += 60000;
+  window.visible = true;
+  window.emit('show');
+  poll();
+  assert.equal(collected.length, 2);
+
+  manager.unbind();
 });
 
 test('does not interfere when DevTools already owns the debugger', async () => {

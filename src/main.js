@@ -24,13 +24,14 @@ const {
   createTokenStore,
   runLinkFlow,
 } = require('./auth');
-const { DiscordPresence } = require('./rpc');
+const { DiscordPresence, applyStatusTemplate } = require('./rpc');
+const { setStatus, checkToken } = require('./cli');
 const { createUpdateManager } = require('./updater');
 const { createWindowResourceManager } = require('./window-resource-manager');
 
 // The root route renders login for a new session and redirects an authenticated
 // user to `/home`. Starting there avoids an anonymous `/home` → `/` redirect.
-const DEFAULT_APP_URL = 'https://music.steeny.fun/';
+const DEFAULT_APP_URL = 'https://music.steeny.fun';
 function resolveAppUrl(rawUrl) {
   try {
     const value = new URL(String(rawUrl || DEFAULT_APP_URL).trim());
@@ -59,10 +60,27 @@ const linkPath = path.join(__dirname, '..', 'assets', 'link.html');
 const linkUrl = pathToFileURL(linkPath).href;
 
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+// These two are disk caches. Shrinking them to 16 MiB was measured against
+// this app and moved the resident total by nothing at all, while costing
+// audio and artwork re-fetches -- so they stay generous.
 app.commandLine.appendSwitch('disk-cache-size', String(50 * 1024 * 1024));
 app.commandLine.appendSwitch('media-cache-size', String(50 * 1024 * 1024));
-app.commandLine.appendSwitch('renderer-process-limit', '2');
-app.commandLine.appendSwitch('js-flags', '--optimize-for-size');
+// One origin, one renderer. The old limit of 2 allowed a second renderer to
+// exist without ever being needed.
+app.commandLine.appendSwitch('renderer-process-limit', '1');
+// The app is a single origin, so every frame can share one renderer instead of
+// Chromium spinning up a process per site instance. Fewer processes is the
+// single biggest saving available that costs nothing visually.
+app.commandLine.appendSwitch('process-per-site');
+// --optimize-for-size trades a little JIT speed for a smaller heap. The
+// old-space cap keeps a long listening session from ratcheting upwards, and a
+// small semi-space keeps the short-lived allocation churn of the player from
+// reserving young-generation memory it only needs at peak. Rendering,
+// textures and image decoding are untouched by all three.
+app.commandLine.appendSwitch(
+  'js-flags',
+  '--optimize-for-size --max-old-space-size=256 --max-semi-space-size=2',
+);
 app.commandLine.appendSwitch(
   'disable-features',
   'SpareRendererForSitePerProcess,BackForwardCache,AudioServiceOutOfProcess',
@@ -82,8 +100,18 @@ let linkAbort = null;
 // the login page cannot turn into a reload loop.
 let recovering = false;
 let lastRecoveryAt = 0;
-const rpc = new DiscordPresence();
-const resources = createWindowResourceManager();
+const rpc = new DiscordPresence({ onLatency: sendRpcLatency });
+const resources = createWindowResourceManager({
+  getMetrics: () => app.getAppMetrics(),
+});
+
+// How long the last status/presence update took to reach Discord. The web
+// app uses it to send the next lyric line that far ahead of the audio, so it
+// lands on Discord right as the line starts instead of trailing behind.
+function sendRpcLatency(ms) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.send('rpc:latency', ms);
+}
 
 function validBounds(value) {
   if (!value || typeof value !== 'object') return null;
@@ -95,6 +123,139 @@ function validBounds(value) {
 
 function statePath() {
   return path.join(app.getPath('userData'), 'window-state.json');
+}
+
+// app.getAppPath() is the project root next to package.json in a dev run
+// (`electron .`); inside a packaged, asar-archived build it is read-only, so
+// this only ever lands the file where the user actually expects it in dev.
+function settingsPath() {
+  return path.join(app.getAppPath(), 'settings.json');
+}
+
+// Cached after the first read. Status updates land at lyric frequency, and
+// re-reading plus re-parsing the file for each one meant synchronous disk I/O
+// on the main process -- the one thread that must never stall -- and a fresh
+// throwaway object every line. The cache is only ever invalidated here, since
+// this process is the sole writer.
+let settingsCache = null;
+
+function readSettings() {
+  if (settingsCache) return settingsCache;
+  try {
+    const raw = fs.readFileSync(settingsPath(), 'utf8');
+    const parsed = JSON.parse(raw);
+    settingsCache = parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    settingsCache = {};
+  }
+  return settingsCache;
+}
+
+function writeDiscordToken(value) {
+  const settings = { ...readSettings(), discord_token: value };
+  fs.writeFileSync(settingsPath(), JSON.stringify(settings, null, 2), {
+    encoding: 'utf8',
+    mode: 0o600,
+  });
+  settingsCache = settings;
+}
+
+// Delivers the "text in status" line onto the account's own custom status via
+// setStatus() from cli.js -- a self-bot call (PATCH /users/@me/settings with
+// the user's own token). The text never reaches Rich Presence (see rpc.js);
+// this is the only place it is shown.
+//
+// Discord rate-limits this endpoint, so lines arriving faster than it can
+// keep up get a 429 with a mandatory retry_after. Earlier this was treated
+// as a hard failure and the line was just dropped -- the visible "skipping".
+// Now a rate-limited request waits out that exact cooldown and retries,
+// unless a newer line has shown up in the meantime, in which case this one
+// is abandoned in favor of the fresher text (there is no point displaying a
+// stale line after waiting on a 429). Only one request is ever in flight:
+// a request that arrives while another is running simply replaces whatever
+// was queued next, so the queue itself never backs up and falls behind.
+const MAX_STATUS_RATE_LIMIT_RETRIES = 4;
+let lastCustomStatusFingerprint = '';
+let customStatusNext = null;
+let customStatusRunning = false;
+
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Discord reports the cooldown two ways: a JSON body ({ retry_after }, in
+// seconds) and a Retry-After header. Either is authoritative; this is not a
+// delay of our own choosing.
+async function rateLimitWaitMs(res) {
+  try {
+    const body = await res.clone().json();
+    if (Number.isFinite(body?.retry_after)) {
+      return Math.max(0, Math.ceil(body.retry_after * 1000));
+    }
+  } catch {
+    // No JSON body to read; fall back to the header below.
+  }
+  const seconds = Number(res.headers?.get?.('retry-after'));
+  return Number.isFinite(seconds) ? Math.max(0, Math.ceil(seconds * 1000)) : 1000;
+}
+
+async function applyCustomStatus(text, emoji) {
+  const token = readSettings().discord_token;
+  if (!token) return { ok: false, error: 'Токен Discord не сохранён.' };
+  const trimmed = String(text || '').trim().slice(0, 128);
+  const trimmedEmoji = String(emoji || '').trim().slice(0, 64);
+  if (!trimmed && !trimmedEmoji && !lastCustomStatusFingerprint) return { ok: true };
+  const fingerprint = `${trimmed} ${trimmedEmoji}`;
+  if (fingerprint === lastCustomStatusFingerprint) return { ok: true };
+
+  for (let attempt = 0; ; attempt += 1) {
+    const sentAt = Date.now();
+    let res;
+    try {
+      res = await setStatus(token, trimmed, trimmedEmoji);
+    } catch (error) {
+      return { ok: false, error: error?.message || 'Не удалось отправить статус.' };
+    }
+    if (res.ok) {
+      // This is the channel the lyric/status text actually travels over now
+      // (Rich Presence no longer carries it) -- report its round trip so the
+      // web app can keep scheduling the next line early enough to land on time.
+      sendRpcLatency(Date.now() - sentAt);
+      lastCustomStatusFingerprint = fingerprint;
+      return { ok: true };
+    }
+    if (res.status !== 429 || attempt >= MAX_STATUS_RATE_LIMIT_RETRIES) {
+      return { ok: false, error: `Discord ответил кодом ${res.status} при обновлении статуса.` };
+    }
+    await delay(await rateLimitWaitMs(res));
+    if (customStatusNext) return { ok: true, superseded: true };
+  }
+}
+
+function scheduleCustomStatus(text, emoji) {
+  return new Promise(resolve => {
+    customStatusNext?.resolve({ ok: true, superseded: true });
+    customStatusNext = { text, emoji, resolve };
+    if (!customStatusRunning) runCustomStatusQueue();
+  });
+}
+
+async function runCustomStatusQueue() {
+  customStatusRunning = true;
+  while (customStatusNext) {
+    const job = customStatusNext;
+    customStatusNext = null;
+    job.resolve(await applyCustomStatus(job.text, job.emoji));
+  }
+  customStatusRunning = false;
+}
+
+function pushCustomStatus(text, emoji = '') {
+  return scheduleCustomStatus(text, emoji);
+}
+
+function clearCustomStatus() {
+  return scheduleCustomStatus('', '');
 }
 
 function loadWindowState() {
@@ -520,8 +681,13 @@ function createWindow() {
 
   mainWindow.once('ready-to-show', () => {
     if (!SMOKE_TEST) {
-      mainWindow.show();
+      // Bind before show(), never after: show() emits 'show' synchronously, so
+      // binding afterwards misses it. The manager would then sample
+      // isVisible() at the one moment a compositor may not have mapped the
+      // surface yet, latch into low-memory mode, and never see an event to
+      // correct itself -- a permanently animation-less, video-less window.
       resources.bind(mainWindow);
+      mainWindow.show();
     }
     if (DEVTOOLS) mainWindow.webContents.openDevTools({ mode: 'detach' });
   });
@@ -551,7 +717,6 @@ function installIpcHandlers() {
     && !mainWindow.isDestroyed()
     && event.sender === mainWindow.webContents
   );
-
   ipcMain.on('window:close', event => {
     if (!fromMainWindow(event)) return;
     mainWindow.close();
@@ -584,11 +749,57 @@ function installIpcHandlers() {
   ipcMain.on('external:open', (event, rawUrl) => {
     if (fromMainWindow(event)) openExternal(rawUrl);
   });
-  ipcMain.on('rpc:update', (event, dataJson) => {
-    if (fromMainWindow(event)) rpc.update(dataJson);
+  ipcMain.handle('rpc:update', async (event, dataJson) => {
+    if (!fromMainWindow(event)) return { ok: false, error: 'forbidden' };
+    // Rich Presence only ever gets title/artist/cover/timestamps -- the lyric
+    // or status text is stripped out in rpc.js and delivered exclusively
+    // through setStatus() below.
+    rpc.update(dataJson);
+    let parsed;
+    try {
+      parsed = JSON.parse(dataJson);
+    } catch {
+      return { ok: false, error: 'Некорректные данные.' };
+    }
+    const rawText = String(parsed?.text ?? parsed?.lyric ?? '');
+    const emoji = String(parsed?.emoji ?? '');
+    const title = String(parsed?.title || '').trim();
+    const artist = String(parsed?.artist || '').trim();
+    const position = Number(parsed?.position) || 0;
+    const text = parsed?.template
+      ? applyStatusTemplate(parsed.template, { text: rawText, title, artist, position })
+      : rawText.replace(/\s+/g, ' ').trim().slice(0, 128);
+    if (!text && !emoji) return clearCustomStatus();
+    return pushCustomStatus(text, emoji);
   });
-  ipcMain.on('rpc:clear', event => {
-    if (fromMainWindow(event)) rpc.clear();
+  ipcMain.handle('rpc:clear', event => {
+    if (!fromMainWindow(event)) return { ok: false, error: 'forbidden' };
+    rpc.clear();
+    return clearCustomStatus();
+  });
+  ipcMain.handle('discord-token:save', async (event, rawValue) => {
+    if (!fromMainWindow(event)) throw new Error('forbidden');
+    const value = typeof rawValue === 'string' ? rawValue.trim() : '';
+    if (!value) return { ok: false, error: 'Введите токен.' };
+    try {
+      const res = await checkToken(value);
+      if (!res.ok) {
+        return {
+          ok: false,
+          error: res.status === 401
+            ? 'Discord отклонил токен (401): он неверный или истёк.'
+            : `Discord ответил кодом ${res.status} при проверке токена.`,
+        };
+      }
+    } catch (error) {
+      return { ok: false, error: error?.message || 'Не удалось проверить токен.' };
+    }
+    writeDiscordToken(value);
+    return { ok: true };
+  });
+  ipcMain.handle('discord-token:has', event => {
+    if (!fromMainWindow(event)) return false;
+    return Boolean(readSettings().discord_token);
   });
   ipcMain.handle('backend:retry', event => {
     if (!fromMainWindow(event)) return false;

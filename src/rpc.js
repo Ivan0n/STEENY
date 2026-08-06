@@ -3,14 +3,77 @@
 const DiscordRPC = require('discord-rpc');
 
 const CLIENT_ID = '1395388116105429195';
-const UPDATE_DELAY_MS = 1200;
 const RECONNECT_DELAY_MS = 8000;
 const INVALID_RPC_PAYLOAD = 4000;
+// discord-rpc resolves a request when the reply arrives over the IPC socket.
+// If Discord stops answering without closing that socket the promise simply
+// never settles -- and since flush() holds a re-entrancy latch across the
+// await, every later update would be dropped for the rest of the session.
+const REQUEST_TIMEOUT_MS = 5000;
+
+// The timer is deliberately not unref'd: it is the only thing standing between
+// a hung request and an await that never returns, so it has to be able to
+// hold the loop for its own short lifetime.
+function withTimeout(promise, ms) {
+  let timer = null;
+  return Promise.race([
+    promise,
+    new Promise((_resolve, reject) => {
+      timer = setTimeout(() => reject(new Error('discord rpc timeout')), ms);
+    }),
+  ]).finally(() => clearTimeout(timer));
+}
 
 function timestampValue(value) {
   if (value instanceof Date) return Math.round(value.getTime());
   const number = Number(value);
   return Number.isFinite(number) ? Math.round(number) : undefined;
+}
+
+function formatTimestamp(totalSeconds) {
+  const whole = Math.max(0, Math.round(Number(totalSeconds) || 0));
+  const minutes = Math.floor(whole / 60);
+  const seconds = whole % 60;
+  return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+}
+
+const LETTERS_ONLY_PATTERN = /['",.]/g;
+const TITLE_SUFFIX_PATTERN = /( ?- ?.+)|(\(.+\))/g;
+
+function replaceAll(source, token, value) {
+  return source.split(token).join(value);
+}
+
+// Lets a caller define its own status text instead of the fixed lyric/artist
+// layout below, e.g. template: '{artist} — {text}'.
+function applyStatusTemplate(template, vars = {}) {
+  const text = String(vars.text || '');
+  const title = String(vars.title || '');
+  const artist = String(vars.artist || '');
+  const tokens = {
+    '{text}': text,
+    '{text_upper}': text.toUpperCase(),
+    '{text_lower}': text.toLowerCase(),
+    '{text_letters_only}': text.replace(LETTERS_ONLY_PATTERN, ''),
+    '{text_upper_letters_only}': text.toUpperCase().replace(LETTERS_ONLY_PATTERN, ''),
+    '{text_lower_letters_only}': text.toLowerCase().replace(LETTERS_ONLY_PATTERN, ''),
+    '{title}': title,
+    '{title_upper}': title.toUpperCase(),
+    '{title_lower}': title.toLowerCase(),
+    '{title_cropped}': title.replace(TITLE_SUFFIX_PATTERN, ''),
+    '{title_upper_cropped}': title.toUpperCase().replace(TITLE_SUFFIX_PATTERN, ''),
+    '{title_lower_cropped}': title.toLowerCase().replace(TITLE_SUFFIX_PATTERN, ''),
+    '{artist}': artist,
+    '{artist_upper}': artist.toUpperCase(),
+    '{artist_lower}': artist.toLowerCase(),
+    '{timestamp}': formatTimestamp(vars.position),
+  };
+
+  let result = String(template || '');
+  for (const [token, value] of Object.entries(tokens)) {
+    result = replaceAll(result, token, value);
+  }
+  return result.replace(/\s+/g, ' ').trim().slice(0, 128);
 }
 
 function rawActivityPayload(activity, compatibilityLevel = 0) {
@@ -44,13 +107,16 @@ function rawActivityPayload(activity, compatibilityLevel = 0) {
 }
 
 class DiscordPresence {
-  constructor() {
+  constructor(options = {}) {
+    // The web app averages these round trips to compensate for network
+    // latency when it schedules the next update.
+    this.onLatency = typeof options.onLatency === 'function' ? options.onLatency : null;
     this.client = null;
     this.ready = false;
     this.connecting = false;
     this.pending = null;
     this.current = null;
-    this.timer = null;
+    this.flushing = false;
     this.reconnectTimer = null;
     this.lastFingerprint = '';
     this.compatibilityLevel = 0;
@@ -102,13 +168,29 @@ class DiscordPresence {
     } catch {
       return;
     }
-    clearTimeout(this.timer);
-    this.timer = setTimeout(() => this.flush(), UPDATE_DELAY_MS);
-    if (!this.ready) this.connect();
+    if (!this.ready) {
+      this.connect();
+      return;
+    }
+    this.flush();
   }
 
+  // Applies `pending` immediately -- no artificial delay. A flush already in
+  // flight is never interrupted; whatever landed in `pending` while it was
+  // running gets picked up right after, so nothing in between is dropped.
   async flush() {
+    if (this.flushing) return;
     if (!this.ready || !this.client || !this.pending) return;
+    this.flushing = true;
+    try {
+      await this.flushOnce();
+    } finally {
+      this.flushing = false;
+      if (this.pending) this.flush();
+    }
+  }
+
+  async flushOnce() {
     const data = this.pending;
     this.pending = null;
 
@@ -119,18 +201,19 @@ class DiscordPresence {
 
     const title = String(data.title || 'Неизвестный трек').trim().slice(0, 128);
     const artist = String(data.artist || '').trim().slice(0, 128);
-    const lyric = String(data.lyric || '').replace(/\s+/g, ' ').trim().slice(0, 128);
-    const cover = String(data.cover_url || '').trim();
     const position = Math.max(0, Number(data.position) || 0);
     const duration = Math.max(0, Number(data.duration) || 0);
+    // The lyric/status text is never shown in Rich Presence -- it only goes to
+    // the account's own custom status via setStatus() in main.js.
+    const cover = String(data.cover_url || '').trim();
     const now = Date.now();
     const activity = {
       type: 2,
-      statusDisplayType: lyric.length >= 2 ? 1 : 2,
+      statusDisplayType: artist ? 1 : 2,
       details: title,
-      state: lyric.length >= 2 ? lyric : artist || undefined,
+      state: artist || undefined,
       largeImageKey: cover.startsWith('https://') ? cover : 'prew',
-      largeImageText: lyric && artist ? `${title} — ${artist}`.slice(0, 128) : title,
+      largeImageText: title,
       smallImageKey: 'logo',
       smallImageText: 'STEENY',
       instance: false,
@@ -153,40 +236,49 @@ class DiscordPresence {
     });
     if (fingerprint === this.lastFingerprint) return;
 
+    const sentAt = Date.now();
     try {
       await this.setActivity(activity);
       this.current = data;
       this.lastFingerprint = fingerprint;
+      this.reportLatency(Date.now() - sentAt);
     } catch {
       this.pending = data;
       this.handleDisconnect(this.client);
     }
   }
 
+  reportLatency(elapsed) {
+    if (!this.onLatency || !Number.isFinite(elapsed) || elapsed < 0) return;
+    try {
+      this.onLatency(Math.round(elapsed));
+    } catch {
+      // A closed renderer must not break the presence loop.
+    }
+  }
+
   async setActivity(activity) {
     while (this.compatibilityLevel < 2) {
       try {
-        await this.client.request('SET_ACTIVITY', {
+        await withTimeout(this.client.request('SET_ACTIVITY', {
           pid: process.pid,
           activity: rawActivityPayload(
             activity,
             this.compatibilityLevel,
           ),
-        });
+        }), REQUEST_TIMEOUT_MS);
         return;
       } catch (error) {
         if (Number(error?.code) !== INVALID_RPC_PAYLOAD) throw error;
         this.compatibilityLevel += 1;
       }
     }
-    await this.client.setActivity(activity);
+    await withTimeout(this.client.setActivity(activity), REQUEST_TIMEOUT_MS);
   }
 
   async clear() {
     this.pending = null;
     this.current = null;
-    clearTimeout(this.timer);
-    this.timer = null;
     if (!this.ready || !this.client || !this.lastFingerprint) return;
     try {
       await this.client.clearActivity();
@@ -197,7 +289,6 @@ class DiscordPresence {
   }
 
   destroy() {
-    clearTimeout(this.timer);
     clearTimeout(this.reconnectTimer);
     this.pending = null;
     this.current = null;
@@ -212,4 +303,4 @@ class DiscordPresence {
   }
 }
 
-module.exports = { DiscordPresence, rawActivityPayload };
+module.exports = { DiscordPresence, rawActivityPayload, applyStatusTemplate, formatTimestamp };

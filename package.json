@@ -47,6 +47,7 @@
     "asar": true,
     "files": [
       "src/**/*",
+      "!src/settings.json",
       "assets/**/*",
       "package.json"
     ],

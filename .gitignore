@@ -5,3 +5,7 @@ dist/
 *.pfx
 *.p12
 certificate_base64.txt
+# Written by the running app (Discord token in cleartext) or used for local
+# CLI testing -- never something that belongs in the repo or a release.
+settings.json
+src/settings.json
